@@ -42,18 +42,21 @@
     </div>
 
     <!-- Touch Controls (Initially Hidden) -->
-    <div id="touchControls" class="touch-controls" style="display: none;">
-        <div class="touch-row">
-            <button id="touchHold" class="touch-button">Hold</button>
-            <button id="touchRotate" class="touch-button">Rotate</button>
-        </div>
-        <div class="touch-row">
-            <button id="touchLeft" class="touch-button">Left</button>
-            <button id="touchRight" class="touch-button">Right</button>
-        </div>
-        <div class="touch-row">
-             <button id="touchDown" class="touch-button">Down</button>
-             <button id="touchDrop" class="touch-button">Drop</button>
+    <div id="touchControlsContainer" style="display: none;"> <!-- Outer container for visibility -->
+        <div class="touch-controls">
+            <!-- Left Side: Movement -->
+            <div class="touch-group touch-movement">
+                <button id="touchLeft" class="touch-button">◀</button>
+                <button id="touchRight" class="touch-button">▶</button>
+                <button id="touchDown" class="touch-button">▼</button> <!-- Soft Drop -->
+            </div>
+
+            <!-- Center/Right Side: Actions -->
+            <div class="touch-group touch-actions">
+                <button id="touchDrop" class="touch-button">DROP</button> <!-- Hard Drop -->
+                <button id="touchRotate" class="touch-button"> ROTATE </button>
+                <button id="touchHold" class="touch-button">HOLD</button>
+            </div>
         </div>
     </div>
 

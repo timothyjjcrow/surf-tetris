@@ -21,6 +21,7 @@ const touchDown = document.getElementById('touchDown');
 const touchRotate = document.getElementById('touchRotate');
 const touchDrop = document.getElementById('touchDrop');
 const touchHold = document.getElementById('touchHold');
+const touchControlsContainer = document.getElementById('touchControlsContainer'); // Get the outer container
 
 // UI Elements
 const opponentCanvas = document.createElement("canvas"); // Create opponent canvas
@@ -1431,18 +1432,24 @@ function setupTouchControls() {
 function addTouchEvent(element, action) {
   if (element) {
     element.addEventListener("touchstart", (e) => {
+      console.log(`Touch started on ${element.id}`); // DEBUG
       e.preventDefault(); // Prevent scrolling/zooming
       if (!isGameOver && gameActive) {
         // Only allow input if game is active
+        console.log(`Executing action for ${element.id}`); // DEBUG
         action();
+      } else {
+        console.log(`Action blocked for ${element.id} (GameOver: ${isGameOver}, GameActive: ${gameActive})`); // DEBUG
       }
     }, { passive: false }); // Need passive: false to call preventDefault
   }
 }
 
 function updateTouchControlsVisibility(show) {
-  if (isTouchDevice && touchControls) {
-    touchControls.style.display = show ? 'flex' : 'none';
+  if (isTouchDevice && touchControlsContainer) {
+    touchControlsContainer.style.display = show ? 'block' : 'none'; // Show/hide the container
+    // Toggle body class to adjust padding
+    document.body.classList.toggle('touch-controls-visible', show);
   }
 }
 
