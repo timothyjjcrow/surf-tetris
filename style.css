@@ -158,10 +158,18 @@ canvas {
 }
 
 .touch-controls {
-    display: flex; /* Use flexbox for layout */
+    /* display: flex; /* Let JS handle initial display state */
     flex-direction: column; /* Stack rows vertically */
     align-items: center; /* Center rows horizontally */
-    margin-top: 20px; /* Space above controls */
+    /* margin-top: 20px; */ /* Removed as it's fixed now */
+    position: fixed; /* Stick to the viewport */
+    bottom: 0;      /* Align to the bottom */
+    left: 0;        /* Align to the left */
+    width: 100%;    /* Span full width */
+    padding: 10px 0; /* Add some padding top/bottom */
+    background-color: rgba(200, 200, 200, 0.8); /* Semi-transparent background */
+    z-index: 100; /* Ensure it's above other elements */
+    box-sizing: border-box; /* Include padding in width */
 }
 
 .touch-row {
@@ -218,5 +226,9 @@ canvas {
         padding: 12px 20px;
         font-size: 1em;
         min-width: 70px;
+    }
+
+    .touch-controls {
+        padding-bottom: env(safe-area-inset-bottom, 10px); /* Add padding for notches/home bars */
     }
 }

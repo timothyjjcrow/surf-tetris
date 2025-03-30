@@ -1281,6 +1281,7 @@ function showStartScreen() {
   privateRoomInfo.style.display = "none"; // Hide room code info
   roomCodeInput.value = ""; // Clear input
   enableStartScreen(); // Ensure buttons are enabled
+  updateTouchControlsVisibility(false); // Hide controls on start screen
 }
 
 function hideStartScreen() {
@@ -1312,6 +1313,7 @@ function displayRoomCode(code) {
 function showGameArea() {
   hideStartScreen(); // Ensure start screen is hidden
   gameAreaElement.style.display = "flex";
+  updateTouchControlsVisibility(true); // Show controls in game area
 }
 
 // --- New Button Handlers ---
@@ -1366,6 +1368,7 @@ function handleJoinPrivate() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("DOM Loaded. Setting up start screen.");
   initDrawingContexts(); // Set up canvases
+  setupTouchControls(); // Setup touch controls on load
   showStartScreen();
   // New button listeners
   playPublicButton.addEventListener("click", handlePlayPublic);
@@ -1413,9 +1416,7 @@ function setupTouchControls() {
   isTouchDevice = isTouchSupported();
   console.log("Is touch device?", isTouchDevice);
 
-  if (isTouchDevice && touchControls) {
-    touchControls.style.display = "flex"; // Show controls
-
+  if (isTouchDevice) { // Only add listeners if touch is supported
     // Add touch event listeners (touchstart is generally preferred for responsiveness)
     addTouchEvent(touchLeft, () => movePiece(-1));
     addTouchEvent(touchRight, () => movePiece(1));
@@ -1423,8 +1424,6 @@ function setupTouchControls() {
     addTouchEvent(touchDown, () => movePieceDown(true)); // Soft drop
     addTouchEvent(touchDrop, hardDrop);
     addTouchEvent(touchHold, holdPiece);
-  } else if (touchControls) {
-    touchControls.style.display = "none"; // Hide controls if not touch
   }
 }
 
@@ -1441,10 +1440,17 @@ function addTouchEvent(element, action) {
   }
 }
 
+function updateTouchControlsVisibility(show) {
+  if (isTouchDevice && touchControls) {
+    touchControls.style.display = show ? 'flex' : 'none';
+  }
+}
+
 // Call setupTouchControls inside the DOMContentLoaded listener
 document.addEventListener("DOMContentLoaded", () => {
   console.log("DOM Loaded. Setting up start screen.");
   initDrawingContexts(); // Set up canvases
+  setupTouchControls(); // Setup touch controls on load
   showStartScreen();
   // New button listeners
   playPublicButton.addEventListener("click", handlePlayPublic);
@@ -1453,52 +1459,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Automatically try to connect WebSocket on load for convenience
   connectWebSocket();
-  setupTouchControls(); // Setup touch controls on load
 });
-
-// Modify handleKeyDown: Add a check at the beginning. If isTouchDevice is true and touchControls are visible, return immediately to ignore keyboard input.
-function handleKeyDown(e) {
-  if (isGameOver || !gameActive) return;
-
-  // Ignore keyboard events if touch controls are visible (likely mobile)
-  if (isTouchDevice && touchControls && touchControls.style.display !== "none") {
-    return;
-  }
-
-  switch (e.keyCode) {
-    case 37: // Left Arrow
-      movePiece(-1);
-    case 39: // Right Arrow
-      movePiece(1);
-    case 40: // Down Arrow
-      movePieceDown();
-    case 38: // Up Arrow
-      rotatePiece();
-    case 32: // Space bar
-      hardDrop();
-    case 67: // C key
-      holdCurrentPiece();
-    case 80: // P key
-      // Pause Toggle
-      // Disable pause in multiplayer for now?
-      // gamePaused = !gamePaused;
-      // console.log(gamePaused ? "Game Paused" : "Game Resumed");
-      // if (!gamePaused) {
-      //     lastTime = performance.now(); // Reset timer on unpause
-      //     gameLoop(); // Restart loop if paused
-      // } else {
-      //     // Optional: Draw a pause overlay
-      //     gameCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      //     gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
-      //     gameCtx.font = '30px Arial';
-      //     gameCtx.fillStyle = 'white';
-      //     gameCtx.textAlign = 'center';
-      //     gameCtx.fillText('Paused', gameCanvas.width / 2, gameCanvas.height / 2);
-      // }
-      console.log("Pause (P) disabled in multiplayer mode.");
-    case 82: // R key
-      // Reset Game (Disable in multiplayer?)
-      // resetGame();
-      console.log("Reset (R) disabled in multiplayer mode.");
-  }
-}
