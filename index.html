@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Tetris</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Multiplayer Tetris</h1>
+    <div id="status">Loading...</div> <!-- Status Indicator -->
+
+    <div id="startScreen" style="text-align: center; margin-top: 50px;">
+        <div class="match-options">
+            <button id="playPublicButton">Play Public Match</button>
+            <button id="createPrivateButton">Create Private Match</button>
+        </div>
+        <div class="private-join">
+            <input type="text" id="roomCodeInput" placeholder="Enter Room Code" maxlength="4">
+            <button id="joinPrivateButton">Join Private Match</button>
+        </div>
+        <div id="privateRoomInfo" style="margin-top: 15px; font-weight: bold; display: none;">
+            <!-- Room code will be displayed here -->
+        </div>
+    </div>
+
+    <div id="gameArea" class="game-container" style="display: none;"> <!-- Hide game initially -->
+        <div class="left-panel">
+            <h2>Hold</h2>
+            <canvas id="holdCanvas" width="120" height="120"></canvas>
+        </div>
+        <div class="main-game-area">
+            <canvas id="gameCanvas" width="300" height="600"></canvas>
+        </div>
+        <div class="right-panel">
+            <h2>Next</h2>
+            <canvas id="nextCanvas" width="120" height="400"></canvas>
+            <div id="score">Score: 0</div>
+            <div id="lines">Lines: 0</div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

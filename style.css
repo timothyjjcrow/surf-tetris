@@ -1,0 +1,158 @@
+* {
+    box-sizing: border-box; /* Include padding and border in element's total width and height */
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* Prevent scrolling */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #2c3e50; /* Dark background */
+    color: #ecf0f1; /* Light text */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+h1 {
+    margin: 10px 0;
+    font-size: 1.8em; /* Responsive font size */
+    color: #e74c3c;
+}
+
+#status {
+    font-size: 1.1em;
+    color: #f1c40f; /* Yellow for status */
+    height: 20px; /* Reserve space */
+    margin-bottom: 5px;
+}
+
+#startScreen {
+    margin-top: 10%; /* Center start button vertically */
+}
+
+#startScreen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px; /* Space between options */
+    margin-top: 5%;
+}
+
+.match-options,
+.private-join {
+    display: flex;
+    gap: 15px; /* Space between buttons/input */
+}
+
+#startScreen button {
+    padding: 12px 20px;
+    font-size: 1.1em;
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#startScreen button:disabled {
+    background-color: #7f8c8d;
+    cursor: not-allowed;
+}
+
+#startScreen button:hover:not(:disabled) {
+    background-color: #c0392b;
+}
+
+#roomCodeInput {
+    padding: 12px;
+    font-size: 1.1em;
+    border: 1px solid #7f8c8d;
+    border-radius: 6px;
+    background-color: #ecf0f1;
+    color: #34495e;
+    width: 150px; /* Adjust width as needed */
+    text-align: center;
+    text-transform: uppercase; /* Force uppercase for codes */
+}
+
+#privateRoomInfo {
+    color: #f1c40f; /* Yellow for info */
+    font-size: 1.2em;
+}
+
+/* Game Area Layout */
+#gameArea {
+    display: flex;
+    flex: 1; /* Allow game area to take remaining vertical space */
+    width: 100%;
+    max-width: 1200px; /* Limit max width on very wide screens */
+    padding: 10px;
+    gap: 10px;
+    justify-content: center; /* Center items horizontally */
+    align-items: stretch; /* Stretch items to fill height */
+}
+
+.left-panel,
+.right-panel,
+.main-game-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start; /* Align content to top */
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.2); /* Semi-transparent background */
+    border-radius: 8px;
+}
+
+.left-panel {
+    flex: 1; /* Allocate space flexibly */
+}
+
+.main-game-area {
+    flex: 2; /* Main game gets more space */
+    justify-content: center; /* Center canvas vertically */
+}
+
+.right-panel {
+    flex: 1; /* Allocate space flexibly */
+}
+
+.left-panel h2,
+.right-panel h2 {
+    margin-bottom: 10px;
+    color: #3498db; /* Blue headings */
+}
+
+/* Canvas Scaling */
+canvas {
+    display: block; /* Remove extra space below canvas */
+    border: 1px solid #7f8c8d; /* Subtle border */
+    background-color: #ecf0f1; /* Light background for contrast */
+    /* IMPORTANT: Allow canvas to scale down within its container */
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain; /* Maintain aspect ratio */
+}
+
+#gameCanvas {
+    background-color: #bdc3c7; /* Slightly darker game background */
+    border: 2px solid #ecf0f1;
+}
+
+#opponentCanvas {
+    border: 1px dashed #95a5a6;
+    background-color: #fdfdfd;
+}
+
+/* Info Display (Score/Lines) */
+.info-display {
+    margin-top: auto; /* Push score/lines to bottom of right panel */
+    padding-top: 10px;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #e74c3c;
+}
