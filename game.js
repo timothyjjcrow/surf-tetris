@@ -4,6 +4,13 @@ const holdCanvas = document.getElementById("holdCanvas");
 const nextCanvas = document.getElementById("nextCanvas");
 const scoreElement = document.getElementById("score");
 const linesElement = document.getElementById("lines");
+const opponentCanvas = document.createElement("canvas"); // Create opponent canvas
+
+const gameCtx = gameCanvas.getContext("2d");
+const holdCtx = holdCanvas.getContext("2d");
+const nextCtx = nextCanvas.getContext("2d");
+
+// UI Elements
 const statusElement = document.getElementById("status");
 const startScreenElement = document.getElementById("startScreen");
 const gameAreaElement = document.getElementById("gameArea");
@@ -12,23 +19,6 @@ const createPrivateButton = document.getElementById("createPrivateButton");
 const joinPrivateButton = document.getElementById("joinPrivateButton");
 const roomCodeInput = document.getElementById("roomCodeInput");
 const privateRoomInfo = document.getElementById("privateRoomInfo");
-
-// Touch Controls Elements
-const touchControls = document.getElementById('touchControls');
-const touchLeft = document.getElementById('touchLeft');
-const touchRight = document.getElementById('touchRight');
-const touchDown = document.getElementById('touchDown');
-const touchRotate = document.getElementById('touchRotate');
-const touchDrop = document.getElementById('touchDrop');
-const touchHold = document.getElementById('touchHold');
-const touchControlsContainer = document.getElementById('touchControlsContainer'); // Get the outer container
-
-// UI Elements
-const opponentCanvas = document.createElement("canvas"); // Create opponent canvas
-
-const gameCtx = gameCanvas.getContext("2d");
-const holdCtx = holdCanvas.getContext("2d");
-const nextCtx = nextCanvas.getContext("2d");
 
 // --- Game Constants ---
 const COLS = 10;
@@ -1282,7 +1272,6 @@ function showStartScreen() {
   privateRoomInfo.style.display = "none"; // Hide room code info
   roomCodeInput.value = ""; // Clear input
   enableStartScreen(); // Ensure buttons are enabled
-  updateTouchControlsVisibility(false); // Hide controls on start screen
 }
 
 function hideStartScreen() {
@@ -1314,7 +1303,6 @@ function displayRoomCode(code) {
 function showGameArea() {
   hideStartScreen(); // Ensure start screen is hidden
   gameAreaElement.style.display = "flex";
-  updateTouchControlsVisibility(true); // Show controls in game area
 }
 
 // --- New Button Handlers ---
@@ -1369,7 +1357,6 @@ function handleJoinPrivate() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("DOM Loaded. Setting up start screen.");
   initDrawingContexts(); // Set up canvases
-  setupTouchControls(); // Setup touch controls on load
   showStartScreen();
   // New button listeners
   playPublicButton.addEventListener("click", handlePlayPublic);
@@ -1400,70 +1387,3 @@ function checkGameOver() {
   }
   return false; // Indicate game is not over
 }
-
-// --- Touch Control Setup ---
-let isTouchDevice = false; // Flag for touch device
-
-// --- Touch Control Setup ---
-function isTouchSupported() {
-  return (
-    "ontouchstart" in window ||
-    navigator.maxTouchPoints > 0 ||
-    navigator.msMaxTouchPoints > 0
-  );
-}
-
-function setupTouchControls() {
-  isTouchDevice = isTouchSupported();
-  console.log("Is touch device?", isTouchDevice);
-
-  if (isTouchDevice) { // Only add listeners if touch is supported
-    // Add touch event listeners (touchstart is generally preferred for responsiveness)
-    addTouchEvent(touchLeft, () => movePiece(-1));
-    addTouchEvent(touchRight, () => movePiece(1));
-    addTouchEvent(touchRotate, rotatePiece);
-    addTouchEvent(touchDown, () => movePieceDown(true)); // Soft drop
-    addTouchEvent(touchDrop, hardDrop);
-    addTouchEvent(touchHold, holdPiece);
-  }
-}
-
-// Helper to add touchstart listener and prevent default behavior
-function addTouchEvent(element, action) {
-  if (element) {
-    element.addEventListener("touchstart", (e) => {
-      console.log(`Touch started on ${element.id}`); // DEBUG
-      e.preventDefault(); // Prevent scrolling/zooming
-      if (!isGameOver && gameActive) {
-        // Only allow input if game is active
-        console.log(`Executing action for ${element.id}`); // DEBUG
-        action();
-      } else {
-        console.log(`Action blocked for ${element.id} (GameOver: ${isGameOver}, GameActive: ${gameActive})`); // DEBUG
-      }
-    }, { passive: false }); // Need passive: false to call preventDefault
-  }
-}
-
-function updateTouchControlsVisibility(show) {
-  if (isTouchDevice && touchControlsContainer) {
-    touchControlsContainer.style.display = show ? 'block' : 'none'; // Show/hide the container
-    // Toggle body class to adjust padding
-    document.body.classList.toggle('touch-controls-visible', show);
-  }
-}
-
-// Call setupTouchControls inside the DOMContentLoaded listener
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("DOM Loaded. Setting up start screen.");
-  initDrawingContexts(); // Set up canvases
-  setupTouchControls(); // Setup touch controls on load
-  showStartScreen();
-  // New button listeners
-  playPublicButton.addEventListener("click", handlePlayPublic);
-  createPrivateButton.addEventListener("click", handleCreatePrivate);
-  joinPrivateButton.addEventListener("click", handleJoinPrivate);
-
-  // Automatically try to connect WebSocket on load for convenience
-  connectWebSocket();
-});
