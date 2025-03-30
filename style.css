@@ -156,3 +156,67 @@ canvas {
     font-weight: bold;
     color: #e74c3c;
 }
+
+.touch-controls {
+    display: flex; /* Use flexbox for layout */
+    flex-direction: column; /* Stack rows vertically */
+    align-items: center; /* Center rows horizontally */
+    margin-top: 20px; /* Space above controls */
+}
+
+.touch-row {
+    display: flex; /* Use flexbox for buttons within a row */
+    justify-content: center; /* Center buttons horizontally */
+    margin-bottom: 10px; /* Space between rows */
+}
+
+.touch-button {
+    padding: 15px 25px; /* Generous padding for touch */
+    font-size: 1.2em; /* Larger text */
+    margin: 0 10px; /* Space between buttons */
+    min-width: 80px; /* Minimum width */
+    border: 2px solid #555;
+    background-color: #eee;
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none; /* Prevent text selection on tap */
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10+ */
+}
+
+.touch-button:active {
+    background-color: #ccc; /* Feedback on tap */
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column; /* Stack main game and side panels vertically */
+        align-items: center; /* Center items when stacked */
+    }
+
+    .gameArea {
+        order: 1; /* Show game area first */
+        margin-bottom: 15px;
+    }
+
+    .right-panel {
+        order: 2; /* Show right panel below game */
+        align-items: center; /* Center items in the panel */
+        width: auto; /* Allow panel to size naturally */
+        margin-left: 0; /* Remove left margin */
+    }
+
+    #opponentCanvasContainer {
+        order: 3; /* Show opponent below right panel */
+        margin-left: 0;
+    }
+
+    /* Make touch buttons a bit smaller on mobile if needed, */
+    /* but ensure they remain easily tappable */
+    .touch-button {
+        padding: 12px 20px;
+        font-size: 1em;
+        min-width: 70px;
+    }
+}

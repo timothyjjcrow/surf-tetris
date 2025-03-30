@@ -4,13 +4,6 @@ const holdCanvas = document.getElementById("holdCanvas");
 const nextCanvas = document.getElementById("nextCanvas");
 const scoreElement = document.getElementById("score");
 const linesElement = document.getElementById("lines");
-const opponentCanvas = document.createElement("canvas"); // Create opponent canvas
-
-const gameCtx = gameCanvas.getContext("2d");
-const holdCtx = holdCanvas.getContext("2d");
-const nextCtx = nextCanvas.getContext("2d");
-
-// UI Elements
 const statusElement = document.getElementById("status");
 const startScreenElement = document.getElementById("startScreen");
 const gameAreaElement = document.getElementById("gameArea");
@@ -19,6 +12,22 @@ const createPrivateButton = document.getElementById("createPrivateButton");
 const joinPrivateButton = document.getElementById("joinPrivateButton");
 const roomCodeInput = document.getElementById("roomCodeInput");
 const privateRoomInfo = document.getElementById("privateRoomInfo");
+
+// Touch Controls Elements
+const touchControls = document.getElementById('touchControls');
+const touchLeft = document.getElementById('touchLeft');
+const touchRight = document.getElementById('touchRight');
+const touchDown = document.getElementById('touchDown');
+const touchRotate = document.getElementById('touchRotate');
+const touchDrop = document.getElementById('touchDrop');
+const touchHold = document.getElementById('touchHold');
+
+// UI Elements
+const opponentCanvas = document.createElement("canvas"); // Create opponent canvas
+
+const gameCtx = gameCanvas.getContext("2d");
+const holdCtx = holdCanvas.getContext("2d");
+const nextCtx = nextCanvas.getContext("2d");
 
 // --- Game Constants ---
 const COLS = 10;
@@ -1386,4 +1395,110 @@ function checkGameOver() {
     return true; // Indicate game is over
   }
   return false; // Indicate game is not over
+}
+
+// --- Touch Control Setup ---
+let isTouchDevice = false; // Flag for touch device
+
+// --- Touch Control Setup ---
+function isTouchSupported() {
+  return (
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0 ||
+    navigator.msMaxTouchPoints > 0
+  );
+}
+
+function setupTouchControls() {
+  isTouchDevice = isTouchSupported();
+  console.log("Is touch device?", isTouchDevice);
+
+  if (isTouchDevice && touchControls) {
+    touchControls.style.display = "flex"; // Show controls
+
+    // Add touch event listeners (touchstart is generally preferred for responsiveness)
+    addTouchEvent(touchLeft, () => movePiece(-1));
+    addTouchEvent(touchRight, () => movePiece(1));
+    addTouchEvent(touchRotate, rotatePiece);
+    addTouchEvent(touchDown, () => movePieceDown(true)); // Soft drop
+    addTouchEvent(touchDrop, hardDrop);
+    addTouchEvent(touchHold, holdPiece);
+  } else if (touchControls) {
+    touchControls.style.display = "none"; // Hide controls if not touch
+  }
+}
+
+// Helper to add touchstart listener and prevent default behavior
+function addTouchEvent(element, action) {
+  if (element) {
+    element.addEventListener("touchstart", (e) => {
+      e.preventDefault(); // Prevent scrolling/zooming
+      if (!isGameOver && gameActive) {
+        // Only allow input if game is active
+        action();
+      }
+    }, { passive: false }); // Need passive: false to call preventDefault
+  }
+}
+
+// Call setupTouchControls inside the DOMContentLoaded listener
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM Loaded. Setting up start screen.");
+  initDrawingContexts(); // Set up canvases
+  showStartScreen();
+  // New button listeners
+  playPublicButton.addEventListener("click", handlePlayPublic);
+  createPrivateButton.addEventListener("click", handleCreatePrivate);
+  joinPrivateButton.addEventListener("click", handleJoinPrivate);
+
+  // Automatically try to connect WebSocket on load for convenience
+  connectWebSocket();
+  setupTouchControls(); // Setup touch controls on load
+});
+
+// Modify handleKeyDown: Add a check at the beginning. If isTouchDevice is true and touchControls are visible, return immediately to ignore keyboard input.
+function handleKeyDown(e) {
+  if (isGameOver || !gameActive) return;
+
+  // Ignore keyboard events if touch controls are visible (likely mobile)
+  if (isTouchDevice && touchControls && touchControls.style.display !== "none") {
+    return;
+  }
+
+  switch (e.keyCode) {
+    case 37: // Left Arrow
+      movePiece(-1);
+    case 39: // Right Arrow
+      movePiece(1);
+    case 40: // Down Arrow
+      movePieceDown();
+    case 38: // Up Arrow
+      rotatePiece();
+    case 32: // Space bar
+      hardDrop();
+    case 67: // C key
+      holdCurrentPiece();
+    case 80: // P key
+      // Pause Toggle
+      // Disable pause in multiplayer for now?
+      // gamePaused = !gamePaused;
+      // console.log(gamePaused ? "Game Paused" : "Game Resumed");
+      // if (!gamePaused) {
+      //     lastTime = performance.now(); // Reset timer on unpause
+      //     gameLoop(); // Restart loop if paused
+      // } else {
+      //     // Optional: Draw a pause overlay
+      //     gameCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      //     gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+      //     gameCtx.font = '30px Arial';
+      //     gameCtx.fillStyle = 'white';
+      //     gameCtx.textAlign = 'center';
+      //     gameCtx.fillText('Paused', gameCanvas.width / 2, gameCanvas.height / 2);
+      // }
+      console.log("Pause (P) disabled in multiplayer mode.");
+    case 82: // R key
+      // Reset Game (Disable in multiplayer?)
+      // resetGame();
+      console.log("Reset (R) disabled in multiplayer mode.");
+  }
 }
