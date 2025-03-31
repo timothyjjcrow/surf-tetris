@@ -2,6 +2,7 @@
 const express = require('express');
 const gameStatsModel = require('../models/gameStatsModel');
 const { authenticateToken } = require('./authRoutes');
+const db = require('../dbConfig'); // Correct import for database connection
 
 const router = express.Router();
 
@@ -85,6 +86,53 @@ router.post('/record-match', async (req, res) => {
   } catch (error) {
     console.error('Match recording error:', error);
     res.status(500).json({ error: 'Failed to record match' });
+  }
+});
+
+// Force-update player stats (for testing)
+router.post('/update-player-stats', async (req, res) => {
+  try {
+    const { userId, wins, losses, eloRating } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+    
+    // First check if the user exists in the player_stats table
+    const checkResult = await db.query(
+      'SELECT COUNT(*) FROM player_stats WHERE user_id = $1',
+      [userId]
+    );
+    
+    let query;
+    let params;
+    
+    if (parseInt(checkResult.rows[0].count) === 0) {
+      // Insert new stats
+      query = `
+        INSERT INTO player_stats (user_id, elo_rating, wins, losses, games_played)
+        VALUES ($1, $2, $3, $4, $5)
+      `;
+      params = [userId, eloRating || 1200, wins || 0, losses || 0, (wins || 0) + (losses || 0)];
+    } else {
+      // Update existing stats
+      query = `
+        UPDATE player_stats 
+        SET elo_rating = $2, 
+            wins = $3, 
+            losses = $4, 
+            games_played = $5
+        WHERE user_id = $1
+      `;
+      params = [userId, eloRating || 1200, wins || 0, losses || 0, (wins || 0) + (losses || 0)];
+    }
+    
+    await db.query(query, params);
+    
+    res.json({ success: true, message: 'Player stats updated successfully' });
+  } catch (error) {
+    console.error('Error updating player stats:', error);
+    res.status(500).json({ error: 'Failed to update player stats' });
   }
 });
 

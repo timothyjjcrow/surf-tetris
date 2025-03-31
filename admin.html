@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris Stats Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #232323;
+            border-radius: 8px;
+        }
+        
+        h1 {
+            color: #00FF00;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #333;
+            color: white;
+        }
+        
+        button {
+            background-color: #00FF00;
+            color: black;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #00CC00;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .success {
+            border-left: 5px solid #00FF00;
+        }
+        
+        .error {
+            border-left: 5px solid #FF0000;
+        }
+        
+        .nav-links {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .nav-links a {
+            color: #00FF00;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tetris Stats Admin</h1>
+        
+        <div id="user-info">
+            <p>Username: <span id="username">Not logged in</span></p>
+            <p>User ID: <span id="user-id">Not logged in</span></p>
+        </div>
+        
+        <div class="form-group">
+            <label for="user-id-input">User ID:</label>
+            <input type="text" id="user-id-input" placeholder="Enter user ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="wins">Wins:</label>
+            <input type="number" id="wins" min="0" value="0">
+        </div>
+        
+        <div class="form-group">
+            <label for="losses">Losses:</label>
+            <input type="number" id="losses" min="0" value="0">
+        </div>
+        
+        <div class="form-group">
+            <label for="elo">ELO Rating:</label>
+            <input type="number" id="elo" min="0" value="1200">
+        </div>
+        
+        <button id="update-stats">Update Stats</button>
+        <button id="use-my-id">Use My User ID</button>
+        
+        <div id="result" class="result">
+            <p id="result-message"></p>
+        </div>
+        
+        <div class="nav-links">
+            <a href="index.html">Play Game</a>
+            <a href="leaderboard.html">View Leaderboard</a>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const userId = localStorage.getItem('tetris_user_id');
+            const username = localStorage.getItem('tetris_username');
+            
+            if (userId && username) {
+                document.getElementById('username').textContent = username;
+                document.getElementById('user-id').textContent = userId;
+                document.getElementById('user-id-input').value = userId;
+            }
+            
+            document.getElementById('use-my-id').addEventListener('click', () => {
+                const userId = localStorage.getItem('tetris_user_id');
+                if (userId) {
+                    document.getElementById('user-id-input').value = userId;
+                } else {
+                    showResult('You need to log in first!', false);
+                }
+            });
+            
+            document.getElementById('update-stats').addEventListener('click', async () => {
+                const userId = document.getElementById('user-id-input').value.trim();
+                const wins = parseInt(document.getElementById('wins').value) || 0;
+                const losses = parseInt(document.getElementById('losses').value) || 0;
+                const eloRating = parseInt(document.getElementById('elo').value) || 1200;
+                
+                if (!userId) {
+                    showResult('User ID is required!', false);
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/stats/update-player-stats', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            userId,
+                            wins,
+                            losses,
+                            eloRating
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        showResult('Stats updated successfully!', true);
+                    } else {
+                        showResult(`Error: ${result.error || 'Unknown error'}`, false);
+                    }
+                } catch (error) {
+                    showResult(`Error: ${error.message}`, false);
+                }
+            });
+            
+            function showResult(message, isSuccess) {
+                const resultElement = document.getElementById('result');
+                const messageElement = document.getElementById('result-message');
+                
+                resultElement.style.display = 'block';
+                resultElement.className = 'result ' + (isSuccess ? 'success' : 'error');
+                messageElement.textContent = message;
+            }
+        });
+    </script>
+</body>
+</html>

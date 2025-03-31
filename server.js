@@ -251,9 +251,24 @@ wss.on('connection', (ws) => {
                         const currentRoom = gameRooms.get(ws.roomId);
                         if (!currentRoom) { logAndIgnore(ws, data.type); break; }
                         
-                        console.log(`Room ${ws.roomId}: Player ${ws.playerNumber} game over.`);
+                        // Check if userId was provided in the payload and use it
+                        if (data.payload.userId) {
+                            ws.userId = data.payload.userId;
+                            console.log(`Updated user ID from game_over payload: ${ws.userId}`);
+                        }
+                        
+                        console.log(`Room ${ws.roomId}: Player ${ws.playerNumber} game over. User ID: ${ws.userId || 'not set'}`);
                         // Mark player as lost
                         ws.lost = true;
+                        
+                        // Save score and lines in case they weren't updated recently
+                        if (data.payload.score !== undefined) {
+                            ws.lastScore = data.payload.score;
+                        }
+                        
+                        if (data.payload.linesCleared !== undefined) {
+                            ws.lastLines = data.payload.linesCleared;
+                        }
                         
                         // Check if the other player is still playing
                         const opponent = (ws === currentRoom.player1) ? currentRoom.player2 : currentRoom.player1;
@@ -264,7 +279,7 @@ wss.on('connection', (ws) => {
                                 payload: {
                                     message: 'Your opponent lost!',
                                     opponentScore: data.payload.score || 0,
-                                    opponentLines: data.payload.lines || 0
+                                    opponentLines: data.payload.linesCleared || 0
                                 }
                             });
                             

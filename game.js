@@ -1372,15 +1372,29 @@ function checkGameOver() {
             sendScoreUpdate();
             
             if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
-              // Get user ID from localStorage
+              // Get user ID from localStorage and ensure auth info is sent
               const userId = localStorage.getItem('tetris_user_id');
+              const token = localStorage.getItem('tetris_token');
               
-              sendMessageToServer("game_over", { 
-                score, 
-                linesCleared,
-                userId: userId // Explicitly include the user ID
-              });
-              console.log("Sent game_over message to server with score:", score, "lines:", linesCleared, "userId:", userId || 'not set');
+              // Re-send auth in case it wasn't established
+              if (userId && token) {
+                console.log("Re-sending authentication before game over");
+                sendMessageToServer('user_auth', { userId, token });
+                
+                // Small delay to ensure auth is processed
+                setTimeout(() => {
+                  sendMessageToServer("game_over", { 
+                    score, 
+                    linesCleared,
+                    userId: userId 
+                  });
+                  console.log("Sent game_over message to server with score:", score, "lines:", linesCleared, "userId:", userId);
+                }, 300);
+              } else {
+                // Still send game over but note the lack of auth
+                sendMessageToServer("game_over", { score, linesCleared });
+                console.log("Sent game_over message without user authentication");
+              }
             }
             
             playerLost = true;
