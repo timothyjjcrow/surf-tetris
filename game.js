@@ -1372,8 +1372,15 @@ function checkGameOver() {
             sendScoreUpdate();
             
             if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
-              sendMessageToServer("game_over", { score, linesCleared });
-              console.log("Sent game_over message to server with score:", score, "lines:", linesCleared);
+              // Get user ID from localStorage
+              const userId = localStorage.getItem('tetris_user_id');
+              
+              sendMessageToServer("game_over", { 
+                score, 
+                linesCleared,
+                userId: userId // Explicitly include the user ID
+              });
+              console.log("Sent game_over message to server with score:", score, "lines:", linesCleared, "userId:", userId || 'not set');
             }
             
             playerLost = true;
@@ -1457,10 +1464,16 @@ function showReturnToMenuButton() {
 // Function to send score updates to the server
 function sendScoreUpdate() {
   if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
+    // Get the user ID from localStorage
+    const userId = localStorage.getItem('tetris_user_id');
+    
     sendMessageToServer("update_score", {
       score: score,
-      lines: linesCleared
+      lines: linesCleared,
+      userId: userId // Send user ID with each score update
     });
+    
+    console.log(`Score update sent: Score=${score}, Lines=${linesCleared}, UserID=${userId || 'not logged in'}`);
   }
 }
 

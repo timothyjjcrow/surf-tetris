@@ -36,6 +36,44 @@ app.use(session({
 app.use('/api/auth', authRoutes);
 app.use('/api/stats', statsRoutes);
 
+// Test leaderboard endpoint for local testing
+app.get('/api/stats/test-leaderboard', (req, res) => {
+  console.log('Serving test leaderboard data');
+  
+  // Sample leaderboard data for testing
+  const testLeaderboard = [
+    {
+      id: 1,
+      username: 'tim',
+      elo_rating: 1250,
+      wins: 3,
+      losses: 1,
+      games_played: 4,
+      win_percentage: 75
+    },
+    {
+      id: 2,
+      username: 'videogameenjoyer',
+      elo_rating: 1220,
+      wins: 2,
+      losses: 2,
+      games_played: 4,
+      win_percentage: 50
+    },
+    {
+      id: 3,
+      username: 'tetris_master',
+      elo_rating: 1400,
+      wins: 8,
+      losses: 2,
+      games_played: 10,
+      win_percentage: 80
+    }
+  ];
+  
+  res.json(testLeaderboard);
+});
+
 // Store active game rooms and waiting player
 let gameRooms = new Map(); // roomId -> { id: string, player1: ws, player2: ws, roomType: 'public'|'private', /* other room state */ }
 let waitingPlayer = null;   // Holds the WebSocket of the player waiting for a public match
@@ -380,6 +418,14 @@ wss.on('connection', (ws) => {
                 case 'update_score':
                     ws.lastScore = data.payload.score;
                     ws.lastLines = data.payload.lines;
+                    
+                    // If user ID is provided, make sure it's set
+                    if (data.payload.userId) {
+                        ws.userId = data.payload.userId;
+                        console.log(`Updated user ID in score update: ${ws.userId}`);
+                    }
+                    
+                    console.log(`Player ${ws.playerNumber} updated score: ${ws.lastScore}, lines: ${ws.lastLines}, userId: ${ws.userId || 'not set'}`);
                     break;
 
                 case 'user_auth':
