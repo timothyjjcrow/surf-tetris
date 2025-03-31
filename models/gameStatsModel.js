@@ -37,8 +37,23 @@ const gameStatsModel = {
         [player2Id]
       );
       
-      if (player1StatsResult.rows.length === 0 || player2StatsResult.rows.length === 0) {
-        throw new Error('Player stats not found');
+      // Initialize player stats if they don't exist
+      if (player1StatsResult.rows.length === 0) {
+        console.log(`Creating new player stats for player1 (${player1Id})`);
+        await client.query(
+          'INSERT INTO player_stats (user_id, elo_rating, wins, losses) VALUES ($1, 1200, 0, 0)',
+          [player1Id]
+        );
+        player1StatsResult.rows = [{ elo_rating: 1200, wins: 0, losses: 0 }];
+      }
+      
+      if (player2StatsResult.rows.length === 0) {
+        console.log(`Creating new player stats for player2 (${player2Id})`);
+        await client.query(
+          'INSERT INTO player_stats (user_id, elo_rating, wins, losses) VALUES ($1, 1200, 0, 0)',
+          [player2Id]
+        );
+        player2StatsResult.rows = [{ elo_rating: 1200, wins: 0, losses: 0 }];
       }
       
       const player1Stats = player1StatsResult.rows[0];

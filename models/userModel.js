@@ -22,7 +22,7 @@ const userModel = {
       
       // Initialize player stats
       await db.query(
-        'INSERT INTO player_stats (user_id) VALUES ($1)',
+        'INSERT INTO player_stats (user_id, elo_rating, wins, losses) VALUES ($1, 1200, 0, 0)',
         [userId]
       );
       
