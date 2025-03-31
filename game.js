@@ -19,6 +19,7 @@ import {
   SHAPES,
   SRS_KICKS
 } from './constants.js';
+import { MobileControlsHandler } from './mobileControls.js';
 
 // --- DOM Elements ---
 const gameCanvas = document.getElementById("gameCanvas");
@@ -48,6 +49,21 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Initialize renderer
   renderer = new GameRenderer(gameCanvas, holdCanvas, nextCanvas, opponentCanvas);
+  
+  // Set up game actions for mobile controls
+  const gameActions = {
+    moveLeft: () => movePiece(-1, 0),
+    moveRight: () => movePiece(1, 0),
+    softDrop: softDrop,
+    hardDrop: hardDrop,
+    rotate: rotatePiece,
+    hold: holdCurrentPiece,
+    startMovement: startMovement,
+    stopMovement: stopMovement
+  };
+  
+  // Initialize mobile controls
+  mobileControls = new MobileControlsHandler(gameActions);
   
   // Set up start screen
   showStartScreen();
@@ -105,6 +121,9 @@ let accumulatedTime = 0;
 let dropInterval = INITIAL_DROP_INTERVAL;
 let lockDelayTimer = null;
 let animationFrameId = null;
+
+// Mobile controls handler
+let mobileControls = null;
 
 // WebSocket connection
 let ws = null;
@@ -460,12 +479,27 @@ function movePiece(dx, dy) {
 }
 
 function softDrop() {
-  if (movePiece(0, 1)) {
-    dropCounter = 0; // Reset drop counter on manual drop
+  // Move the piece down with a moderate effect
+  let moveCount = 0;
+  
+  // Move down until collision or a reasonable limit
+  const maxMoves = 2; // Reduced from 3 to 2 for more moderate effect
+  
+  while (moveCount < maxMoves && movePiece(0, 1)) {
+    moveCount++;
     // Add score for soft drop (optional)
-    // score += 1;
-    // scoreElement.textContent = `Score: ${score}`;
+    score += 1;
   }
+  
+  // Reset last time to prevent immediate auto-drop after soft drop
+  lastTime = performance.now();
+  
+  // Update score display if we moved
+  if (moveCount > 0) {
+    updateScore(score);
+  }
+  
+  return moveCount > 0;
 }
 
 function hardDrop() {
@@ -907,6 +941,18 @@ const keyMap = {
   },
 };
 
+// Game actions for mobile controls
+const gameActions = {
+  moveLeft: () => movePiece(-1, 0),
+  moveRight: () => movePiece(1, 0),
+  softDrop: softDrop,
+  hardDrop: hardDrop,
+  rotate: rotatePiece,
+  hold: holdCurrentPiece,
+  startMovement: startMovement,
+  stopMovement: stopMovement
+};
+
 document.addEventListener("keydown", (event) => {
   // Ignore input if game not active
   if (gameOver || gamePaused || gameWon || !gameStarted) return;
@@ -982,9 +1028,9 @@ function showGameArea() {
   hideStartScreen();
   gameAreaElement.style.display = "flex";
   
-  // Initialize renderer if not already created
-  if (!renderer) {
-    renderer = new GameRenderer(gameCanvas, holdCanvas, nextCanvas, opponentCanvas);
+  // Show mobile controls when game area is visible
+  if (mobileControls) {
+    mobileControls.show();
   }
 }
 
@@ -1099,14 +1145,23 @@ function checkGameOver() {
 // Reset the game for a new match
 function resetGame() {
   initGameState();
-  lastTime = 0; // Reset animation timer
-  accumulatedTime = 0;
-  console.log("Game Reset and Started");
-  gameLoop(); // Start the game loop
+  initOpponentBoard();
+  gameWon = false;
+  gameOver = false;
+  gamePaused = false;
+  
+  // Initialize or show mobile controls immediately
+  if (!mobileControls) {
+    mobileControls = new MobileControlsHandler(gameActions);
+  } else {
+    mobileControls.show();
+  }
+  
+  startGame();
 }
 
 // Start the game
 function startGame() {
-  // Just call resetGame to start the game with a clean state
-  resetGame();
+  gameStarted = true;
+  gameLoop();
 }

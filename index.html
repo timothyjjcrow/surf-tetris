@@ -2,9 +2,64 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Multiplayer Tetris</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Mobile Controls Styling */
+        .mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .mobile-control-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            border: 2px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            touch-action: manipulation;
+            cursor: pointer;
+        }
+        
+        .mobile-control-btn.active {
+            background-color: rgba(60, 60, 255, 0.7);
+        }
+        
+        /* Instructions for gestures */
+        .mobile-instructions {
+            display: none;
+            position: absolute;
+            top: 5px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        /* Force show mobile controls on mobile devices */
+        @media screen and (max-width: 800px), 
+               (orientation: portrait), 
+               (max-device-width: 800px) {
+            .mobile-controls, .mobile-instructions {
+                display: flex !important;
+            }
+        }
+    </style>
 </head>
 <body>
     <h1>Multiplayer Tetris</h1>
@@ -31,6 +86,16 @@
         </div>
         <div class="main-game-area">
             <canvas id="gameCanvas" width="300" height="600"></canvas>
+            
+            <!-- Mobile gesture instructions -->
+            <div id="mobileInstructions" class="mobile-instructions">
+                Tap to rotate • Swipe & hold left/right to move • Swipe down to drop • Swipe up to hard drop
+            </div>
+            
+            <!-- Mobile Controls (Only Hold button) -->
+            <div id="mobileControls" class="mobile-controls">
+                <button id="holdBtn" class="mobile-control-btn">HOLD</button>
+            </div>
         </div>
         <div class="right-panel">
             <h2>Next</h2>
