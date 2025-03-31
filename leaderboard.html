@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris Battle - Leaderboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
+        }
+        
+        h1 {
+            color: #00FF00;
+            margin: 0;
+        }
+        
+        .nav-links a {
+            color: #00FF00;
+            text-decoration: none;
+            margin-left: 20px;
+        }
+        
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .leaderboard {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .leaderboard th, .leaderboard td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        
+        .leaderboard th {
+            background-color: #232323;
+            color: #00FF00;
+            font-weight: bold;
+        }
+        
+        .leaderboard tr:nth-child(even) {
+            background-color: #1e1e1e;
+        }
+        
+        .leaderboard tr:hover {
+            background-color: #2a2a2a;
+        }
+        
+        .rank {
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .top-rank {
+            font-size: 1.2em;
+            color: gold;
+        }
+        
+        .second-rank {
+            color: silver;
+        }
+        
+        .third-rank {
+            color: #cd7f32; /* bronze */
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+            color: #888;
+        }
+        
+        .error {
+            color: #ff6b6b;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .profile-info {
+            background-color: #232323;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .profile-info p {
+            margin: 5px 0;
+        }
+        
+        .profile-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .login-prompt {
+            text-align: center;
+            padding: 20px;
+            background-color: #232323;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .login-prompt a {
+            color: #00FF00;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        
+        .login-prompt a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Tetris Battle Leaderboard</h1>
+            <div class="nav-links">
+                <a href="index.html">Play Game</a>
+                <a href="#" id="profile-link">My Profile</a>
+                <a href="#" id="logout-link">Logout</a>
+            </div>
+        </header>
+        
+        <div id="login-prompt" class="login-prompt" style="display: none;">
+            <p>Log in to see your stats and rankings!</p>
+            <a href="login.html">Login / Register</a>
+        </div>
+        
+        <div id="profile-section" class="profile-info" style="display: none;">
+            <div class="profile-heading">
+                <h2>My Stats</h2>
+                <span id="player-rank"></span>
+            </div>
+            <p>Username: <span id="profile-username"></span></p>
+            <p>ELO Rating: <span id="profile-elo"></span></p>
+            <p>Wins: <span id="profile-wins"></span></p>
+            <p>Losses: <span id="profile-losses"></span></p>
+            <p>Win Rate: <span id="profile-winrate"></span>%</p>
+        </div>
+        
+        <h2>Top Players</h2>
+        <table class="leaderboard">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>ELO Rating</th>
+                    <th>Wins</th>
+                    <th>Losses</th>
+                    <th>Win Rate</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard-body">
+                <tr class="loading">
+                    <td colspan="6">Loading leaderboard data...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('tetris_token');
+            const userId = localStorage.getItem('tetris_user_id');
+            const username = localStorage.getItem('tetris_username');
+            
+            const loginPrompt = document.getElementById('login-prompt');
+            const profileSection = document.getElementById('profile-section');
+            const profileLink = document.getElementById('profile-link');
+            const logoutLink = document.getElementById('logout-link');
+            
+            // Handle authentication UI
+            if (token) {
+                loginPrompt.style.display = 'none';
+                profileSection.style.display = 'block';
+                document.getElementById('profile-username').textContent = username;
+                
+                // Fetch user profile data
+                fetchUserProfile();
+            } else {
+                loginPrompt.style.display = 'block';
+                profileSection.style.display = 'none';
+                profileLink.style.display = 'none';
+                logoutLink.style.display = 'none';
+            }
+            
+            // Logout handler
+            logoutLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('tetris_token');
+                localStorage.removeItem('tetris_user_id');
+                localStorage.removeItem('tetris_username');
+                window.location.reload();
+            });
+            
+            // Fetch leaderboard data
+            fetchLeaderboard();
+            
+            async function fetchLeaderboard() {
+                try {
+                    const response = await fetch('/api/stats/leaderboard');
+                    const leaderboardData = await response.json();
+                    
+                    if (!Array.isArray(leaderboardData)) {
+                        throw new Error('Invalid leaderboard data');
+                    }
+                    
+                    displayLeaderboard(leaderboardData);
+                } catch (error) {
+                    console.error('Error fetching leaderboard:', error);
+                    document.getElementById('leaderboard-body').innerHTML = `
+                        <tr class="error">
+                            <td colspan="6">Error loading leaderboard data. Please try again later.</td>
+                        </tr>
+                    `;
+                }
+            }
+            
+            function displayLeaderboard(players) {
+                const leaderboardBody = document.getElementById('leaderboard-body');
+                
+                if (players.length === 0) {
+                    leaderboardBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center;">No players on the leaderboard yet.</td>
+                        </tr>
+                    `;
+                    return;
+                }
+                
+                leaderboardBody.innerHTML = players.map((player, index) => {
+                    const rankClass = 
+                        index === 0 ? 'top-rank' : 
+                        index === 1 ? 'second-rank' : 
+                        index === 2 ? 'third-rank' : '';
+                    
+                    const highlightCurrentUser = userId && player.id === parseInt(userId) ? 'style="background-color: rgba(0, 255, 0, 0.1);"' : '';
+                    
+                    return `
+                        <tr ${highlightCurrentUser}>
+                            <td class="rank ${rankClass}">${index + 1}</td>
+                            <td>${player.username}</td>
+                            <td>${player.elo_rating}</td>
+                            <td>${player.wins}</td>
+                            <td>${player.losses}</td>
+                            <td>${player.win_percentage}%</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+            
+            async function fetchUserProfile() {
+                if (!token) return;
+                
+                try {
+                    const response = await fetch('/api/auth/profile', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch profile');
+                    }
+                    
+                    const profileData = await response.json();
+                    
+                    // Display profile data
+                    document.getElementById('profile-elo').textContent = profileData.elo_rating;
+                    document.getElementById('profile-wins').textContent = profileData.wins;
+                    document.getElementById('profile-losses').textContent = profileData.losses;
+                    
+                    const winRate = profileData.games_played > 0 
+                        ? Math.round((profileData.wins / profileData.games_played) * 100) 
+                        : 0;
+                    document.getElementById('profile-winrate').textContent = winRate;
+                    
+                    // Fetch player rank (this would be a separate API call)
+                    // For now we'll just use placeholder
+                    document.getElementById('player-rank').textContent = "Loading rank...";
+                } catch (error) {
+                    console.error('Error fetching profile:', error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

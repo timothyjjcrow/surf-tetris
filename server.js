@@ -2,14 +2,48 @@ const WebSocket = require('ws');
 const http = require('http');
 const fs = require('fs');
 const path = require('path'); // Keep path
+const express = require('express');
+const session = require('express-session');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+// Import database and routes
+const db = require('./dbConfig');
+const { router: authRoutes } = require('./routes/authRoutes');
+const statsRoutes = require('./routes/statsRoutes');
+const { initializeDatabase } = require('./dbInit');
+const gameStatsModel = require('./models/gameStatsModel');
 
 const PORT = process.env.PORT || 8080;
 
+// Create Express app
+const app = express();
+
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('.'));
+
+// Session configuration (if needed for non-JWT authentication)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'tetris-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
+
+// API routes
+app.use('/api/auth', authRoutes);
+app.use('/api/stats', statsRoutes);
+
 // Store active game rooms and waiting player
-let gameRooms = new Map(); // roomId -> { id: string, player1: ws, player2: ws, /* other room state */ }
+let gameRooms = new Map(); // roomId -> { id: string, player1: ws, player2: ws, roomType: 'public'|'private', /* other room state */ }
 let waitingPlayer = null;   // Holds the WebSocket of the player waiting for a public match
 let privateRooms = new Map(); // roomCode -> { creatorWs: ws, roomId: string | null } (roomId is null until joined)
 let roomIdCounter = 1;
+
+// Track authenticated users
+let authenticatedUsers = new Map(); // userId -> { ws: WebSocket, username: string, eloRating: number }
 
 // Simple Garbage Calculation Rules
 const GARBAGE_MAP = {
@@ -21,40 +55,7 @@ const GARBAGE_MAP = {
 };
 
 // --- HTTP Server Setup (to serve static files) ---
-const server = http.createServer((req, res) => {
-    let filePath = '.' + req.url;
-    if (filePath === './') {
-        filePath = './index.html';
-    }
-
-    const extname = String(path.extname(filePath)).toLowerCase();
-    const mimeTypes = {
-        '.html': 'text/html',
-        '.js': 'text/javascript',
-        '.css': 'text/css',
-        // Add other types if needed
-    };
-
-    const contentType = mimeTypes[extname] || 'application/octet-stream';
-
-    fs.readFile(filePath, (error, content) => {
-        if (error) {
-            if (error.code == 'ENOENT') {
-                // Page not found
-                res.writeHead(404, { 'Content-Type': 'text/html' });
-                res.end('404 Not Found');
-            } else {
-                // Server error
-                res.writeHead(500);
-                res.end('Sorry, check with the site admin for error: '+error.code+' ..\n');
-            }
-        } else {
-            // Success
-            res.writeHead(200, { 'Content-Type': contentType });
-            res.end(content, 'utf-8');
-        }
-    });
-});
+const server = http.createServer(app);
 
 // --- WebSocket Server Setup (attach to HTTP server) ---
 const wss = new WebSocket.Server({ server }); // Attach WebSocket server to the HTTP server
@@ -64,6 +65,7 @@ wss.on('connection', (ws) => {
     ws.roomId = null; // Assign null initially
     ws.playerNumber = null; // Assign null initially
     ws.lost = false; // Assign lost status initially
+    ws.userId = null; // Add userId for authenticated users
 
     // Send initial status or welcome message if desired
     sendMessage(ws, { type: 'status', payload: { message: 'Connected to server. Choose match type.' } });
@@ -79,6 +81,12 @@ wss.on('connection', (ws) => {
 
             // --- Handle Different Message Types ---
             switch (data.type) {
+                // -- Authentication Messages --
+                case 'authenticate':
+                    // Handle authentication with JWT token
+                    handleAuthentication(ws, data.payload);
+                    break;
+
                 // -- Matchmaking Messages (No room check needed) --
                 case 'find_public_match':
                     if (waitingPlayer && waitingPlayer !== ws) {
@@ -444,6 +452,33 @@ function logAndIgnore(ws, messageType, isDefault = false) {
         console.warn(`Received message type '${messageType}' from client not in a valid room (Player ${ws.playerNumber}, Room ${ws.roomId}). Ignoring.`);
     }
 }
+
+function handleAuthentication(ws, payload) {
+    const token = payload.token;
+    if (!token) {
+        console.log('No authentication token provided.');
+        return;
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) {
+            console.log('Invalid authentication token:', err);
+            return;
+        }
+
+        const userId = decoded.userId;
+        const username = decoded.username;
+        const eloRating = decoded.eloRating;
+
+        authenticatedUsers.set(userId, { ws: ws, username: username, eloRating: eloRating });
+        ws.userId = userId;
+
+        console.log(`User authenticated: ${username} (ID: ${userId})`);
+    });
+}
+
+// Initialize database
+initializeDatabase();
 
 // Start the HTTP server (which also handles WebSocket upgrades)
 server.listen(PORT, () => {
