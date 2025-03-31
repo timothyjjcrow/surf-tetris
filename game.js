@@ -17,7 +17,13 @@ import {
   INITIAL_DROP_INTERVAL,
   COLORS,
   SHAPES,
-  SRS_KICKS
+  SRS_KICKS,
+  SPEEDUP_NOTIFICATION_DURATION,
+  SPEEDUP_LINES_THRESHOLD,
+  SPEEDUP_DURATION,
+  SPEEDUP_FACTOR,
+  SCRAMBLE_INTENSITY,
+  SCRAMBLE_NOTIFICATION_DURATION
 } from './constants.js';
 import { MobileControlsHandler } from './mobileControls.js';
 
@@ -28,6 +34,54 @@ const nextCanvas = document.getElementById("nextCanvas");
 const opponentCanvas = document.getElementById("opponentCanvas"); // Get the existing canvas instead of creating a new one
 const scoreElement = document.getElementById("score");
 const linesElement = document.getElementById("lines");
+
+// Speed-up notification element
+const notificationContainer = document.createElement("div");
+notificationContainer.id = "notificationContainer";
+notificationContainer.style.cssText = `
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  pointer-events: none;
+`;
+document.body.appendChild(notificationContainer);
+
+// Add CSS for notification animations
+const notificationStyle = document.createElement("style");
+notificationStyle.textContent = `
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(-20px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-20px); }
+  }
+  .game-notification {
+    padding: 10px 20px;
+    margin: 10px auto;
+    border-radius: 5px;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    animation: fadeInOut 3s forwards;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    pointer-events: none;
+  }
+  .speedup-sent {
+    background-color: #4CAF50; /* Green for sending attack */
+  }
+  .speedup-received {
+    background-color: #F44336; /* Red for receiving attack */
+  }
+  .scramble-sent {
+    background-color: #2196F3; /* Blue for sending scramble */
+  }
+  .scramble-received {
+    background-color: #FF9800; /* Orange for receiving scramble */
+  }
+`;
+document.head.appendChild(notificationStyle);
 
 // Initialize canvas dimensions
 document.addEventListener('DOMContentLoaded', () => {
@@ -114,6 +168,16 @@ let playerWon = false;
 let roomId = null; 
 let level = 1; // Added missing level variable with initial value
 let searchingForMatch = false; // Track if we're currently searching for a match
+
+// Speed-up attack state
+let isSpeedUpActive = false;
+let speedUpTimer = null;
+let baseDropInterval = INITIAL_DROP_INTERVAL;
+
+// Scramble attack state
+let isScrambleActive = false;
+let scrambleTimer = null;
+let originalBoardState = null;
 
 // Animation and timing state
 let lastTime = 0;
@@ -296,6 +360,60 @@ function handleServerMessage(message) {
 
     case "game_over":
       // Handled by checkGameOver sending the message
+      break;
+
+    case "speed_up":
+      if (message.payload.type === "sent") {
+        // Show notification for sent speed-up
+        showNotification("Speed-up sent!", "speedup-sent");
+      } else if (message.payload.type === "received") {
+        // Activate speed-up on receive
+        activateSpeedUp(message.payload.duration);
+        showNotification("Speed-up received!", "speedup-received");
+      }
+      break;
+
+    case "scramble":
+      if (message.payload.type === "sent") {
+        // Show notification for sent scramble
+        showNotification("Scramble sent!", "scramble-sent");
+      } else if (message.payload.type === "received") {
+        // Activate scramble on receive
+        showNotification("Board scrambled!", "scramble-received");
+        
+        // Apply scramble to current player's board directly
+        scrambleCurrentBoard(message.payload.intensity);
+      }
+      break;
+
+    case "opponent_game_over":
+      // Handler for when opponent loses
+      console.log("Opponent lost the game!");
+      opponentLost = true;
+      playerWon = true;
+      gameWon = true;
+      
+      // Show victory message with opponent's stats
+      const opponentScore = message.payload.opponentScore || 0;
+      const opponentLines = message.payload.opponentLines || 0;
+      updateStatus(`You won! Opponent score: ${opponentScore}, lines: ${opponentLines}`);
+      
+      // Show a victory notification
+      showNotification("You won the game!", "speedup-sent");
+      
+      // Keep the game loop running so the player can see their final board
+      break;
+      
+    case "game_lost":
+      // Handler for when we're told we lost
+      console.log("Game lost confirmed by server");
+      playerLost = true;
+      gameOver = true;
+      
+      // Show loss message with opponent stats if available
+      const winnerScore = message.payload.opponentScore || 0;
+      const winnerLines = message.payload.opponentLines || 0;
+      updateStatus(`You lost! Opponent score: ${winnerScore}, lines: ${winnerLines}`);
       break;
 
     default:
@@ -683,7 +801,10 @@ function lockPiece() {
 
     linesCleared += clearedLineCount;
     level = Math.floor(linesCleared / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 50);
+    baseDropInterval = Math.max(100, 1000 - (level - 1) * 50);
+    if (!isSpeedUpActive) {
+      dropInterval = baseDropInterval;
+    }
 
     updateScore(score);
     updateLines(linesCleared);
@@ -694,6 +815,29 @@ function lockPiece() {
 
     // Inform server about line clears
     sendMessageToServer("line_clear", { lines: clearedLineCount });
+    
+    // Check if we should trigger an attack
+    if (clearedLineCount >= SPEEDUP_LINES_THRESHOLD) {
+      console.log("Sending attack!");
+      
+      // Randomly choose between speed-up and scramble attacks
+      const attackType = Math.random() < 0.5 ? 'speed_up' : 'scramble';
+      
+      if (attackType === 'speed_up') {
+        sendMessageToServer("speed_up", { 
+          duration: SPEEDUP_DURATION / 1000, // Convert to seconds for network transmission
+          factor: SPEEDUP_FACTOR 
+        });
+        // Show notification that we sent a speed-up attack
+        showNotification("Speed-up sent to opponent!", "speedup-sent");
+      } else {
+        sendMessageToServer("scramble", { 
+          intensity: SCRAMBLE_INTENSITY
+        });
+        // Show notification that we sent a scramble attack
+        showNotification("Scramble sent to opponent!", "scramble-sent");
+      }
+    }
   }
 
   // --- Spawn Next Piece --- //
@@ -865,6 +1009,19 @@ function updateScore(score) {
 function updateLines(lines) {
   // Update lines cleared display
   linesElement.textContent = `Lines: ${lines}`;
+}
+
+// Show a notification message
+function showNotification(message, type) {
+  const notification = document.createElement("div");
+  notification.className = `game-notification ${type}`;
+  notification.textContent = message;
+  notificationContainer.appendChild(notification);
+  
+  // Remove notification after animation completes
+  setTimeout(() => {
+    notification.remove();
+  }, SPEEDUP_NOTIFICATION_DURATION);
 }
 
 // --- Game Loop ---
@@ -1183,4 +1340,136 @@ function cancelMatchSearch() {
   }
   searchingForMatch = false;
   enableStartScreen();
+}
+
+// Activate speed-up attack
+function activateSpeedUp(duration) {
+  if (isSpeedUpActive) return; // Don't activate if already active
+  
+  isSpeedUpActive = true;
+  speedUpTimer = setTimeout(() => {
+    isSpeedUpActive = false;
+    dropInterval = baseDropInterval;
+  }, duration * 1000); // Convert seconds to milliseconds
+  
+  baseDropInterval = dropInterval;
+  dropInterval = Math.max(50, dropInterval / 2); // Reduce drop interval by half
+}
+
+// Activate scramble attack
+function activateScramble(intensity) {
+  if (isScrambleActive) return; // Don't activate if already active
+  
+  isScrambleActive = true;
+  // Store original board state by deep copying
+  originalBoardState = board.map(row => [...row]);
+  
+  // Scramble the board by swapping blocks
+  for (let i = 0; i < intensity; i++) {
+    // Pick a random row to scramble (avoid hidden rows)
+    const row = HIDDEN_ROWS + Math.floor(Math.random() * (TOTAL_ROWS - HIDDEN_ROWS));
+    
+    // Pick two random positions to swap
+    const pos1 = Math.floor(Math.random() * COLS);
+    let pos2 = Math.floor(Math.random() * COLS);
+    
+    // Make sure pos2 is different from pos1
+    while (pos2 === pos1) {
+      pos2 = Math.floor(Math.random() * COLS);
+    }
+    
+    // Only swap if both positions contain blocks
+    if (board[row][pos1] !== 0 || board[row][pos2] !== 0) {
+      // Swap the blocks
+      [board[row][pos1], board[row][pos2]] = [board[row][pos2], board[row][pos1]];
+    }
+  }
+  
+  // Redraw the board with scrambled blocks
+  drawBoard();
+  
+  // Reset after a short delay
+  scrambleTimer = setTimeout(() => {
+    isScrambleActive = false;
+    // Optionally restore original board state
+    // board = originalBoardState;
+    // drawBoard();
+  }, 5000); // Reset flag after 5 seconds
+}
+
+// Scramble the current board
+function scrambleCurrentBoard(intensity) {
+  console.log(`Scrambling board with intensity ${intensity}`);
+  
+  // Set the scramble flag
+  isScrambleActive = true;
+  
+  // Store original board state by deep copying
+  originalBoardState = board.map(row => [...row]);
+  
+  // Safer scrambling that won't create floating blocks:
+  
+  // 1. Identify rows with blocks that we can work with (in the visible area)
+  const rowsWithBlocks = [];
+  for (let r = HIDDEN_ROWS; r < TOTAL_ROWS; r++) {
+    if (board[r].some(cell => cell !== 0)) {
+      rowsWithBlocks.push(r);
+    }
+  }
+  
+  // If there aren't enough rows with blocks, don't scramble
+  if (rowsWithBlocks.length < 2) {
+    console.log("Not enough rows with blocks to scramble");
+    isScrambleActive = false;
+    return;
+  }
+  
+  // 2. Scramble individual rows by swapping blocks WITHIN THE SAME ROW
+  // This preserves the "gravity" of Tetris since no blocks float
+  for (let i = 0; i < Math.min(intensity, rowsWithBlocks.length * 2); i++) {
+    // Pick a random row that has blocks
+    const randomIndex = Math.floor(Math.random() * rowsWithBlocks.length);
+    const row = rowsWithBlocks[randomIndex];
+    
+    // Find positions with blocks in this row
+    const blocksInRow = [];
+    for (let c = 0; c < COLS; c++) {
+      if (board[row][c] !== 0) {
+        blocksInRow.push(c);
+      }
+    }
+    
+    // If there are at least 2 blocks in this row, swap two random blocks
+    if (blocksInRow.length >= 2) {
+      const pos1Index = Math.floor(Math.random() * blocksInRow.length);
+      let pos2Index = Math.floor(Math.random() * blocksInRow.length);
+      
+      // Make sure we're swapping different positions
+      while (pos2Index === pos1Index) {
+        pos2Index = Math.floor(Math.random() * blocksInRow.length);
+      }
+      
+      const pos1 = blocksInRow[pos1Index];
+      const pos2 = blocksInRow[pos2Index];
+      
+      // Swap the blocks
+      [board[row][pos1], board[row][pos2]] = [board[row][pos2], board[row][pos1]];
+    }
+  }
+  
+  // 3. Add a visual effect by flashing the board
+  const boardBackup = gameCanvas.style.border || 'none';
+  gameCanvas.style.border = '3px solid #FF9800'; // Orange border
+  setTimeout(() => {
+    gameCanvas.style.border = boardBackup; // Restore original border
+  }, 500);
+  
+  // Redraw the board with scrambled blocks
+  drawBoard();
+  
+  // Reset scramble active flag after a delay
+  scrambleTimer = setTimeout(() => {
+    isScrambleActive = false;
+    gameCanvas.style.border = boardBackup;
+  }, 5000);
 }

@@ -176,6 +176,40 @@ function handleJoinPrivateMatch(ws, payload) {
     }
 }
 
+// --- Speed Up Attack Handler ---
+/**
+ * Handles speed-up attack message from a player
+ * @param {WebSocket} ws The client sending the speed-up
+ * @param {Object} payload The speed-up payload containing duration and factor
+ */
+function handleSpeedUp(ws, payload) {
+    const opponent = getOpponent(ws);
+    if (!opponent || opponent.readyState !== WebSocket.OPEN) {
+        console.log("Cannot send speed-up: opponent not found or disconnected");
+        return;
+    }
+
+    console.log(`Player ${ws.playerNumber} sent speed-up attack to Player ${opponent.playerNumber}`);
+    
+    // Notify the opponent about the speed-up attack
+    sendMessage(opponent, { 
+        type: 'speed_up', 
+        payload: { 
+            type: 'received',
+            duration: payload.duration,
+            factor: payload.factor
+        } 
+    });
+    
+    // Confirm to the sender that the speed-up was sent
+    sendMessage(ws, { 
+        type: 'speed_up', 
+        payload: { 
+            type: 'sent'
+        } 
+    });
+}
+
 // --- Getters ---
 
 function getRoom(roomId) {
@@ -209,5 +243,6 @@ module.exports = {
     getRoom,
     getOpponent,
     getGameRooms, // Expose map for broadcast
-    getTotalPlayers // For logging total connections if needed
+    getTotalPlayers, // For logging total connections if needed
+    handleSpeedUp
 };

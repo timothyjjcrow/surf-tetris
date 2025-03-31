@@ -202,3 +202,13 @@ export const SCORING = {
   SOFT_DROP: 1,
   HARD_DROP: 2
 };
+
+// Power-up attack constants
+export const SPEEDUP_LINES_THRESHOLD = 4; // Number of lines needed to trigger speed up attack
+export const SPEEDUP_DURATION = 10000; // Speed up duration in milliseconds
+export const SPEEDUP_FACTOR = 2.0; // How much faster opponent's pieces drop
+export const SPEEDUP_NOTIFICATION_DURATION = 3000; // How long the notification displays
+
+// Scramble attack constants
+export const SCRAMBLE_INTENSITY = 15; // Reduced from 25 for more balanced effect
+export const SCRAMBLE_NOTIFICATION_DURATION = 3000; // How long the notification displays

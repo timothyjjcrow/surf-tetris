@@ -202,16 +202,108 @@ wss.on('connection', (ws) => {
                     {
                         const currentRoom = gameRooms.get(ws.roomId);
                         if (!currentRoom) { logAndIgnore(ws, data.type); break; }
+                        
+                        console.log(`Room ${ws.roomId}: Player ${ws.playerNumber} game over.`);
+                        // Mark player as lost
+                        ws.lost = true;
+                        
+                        // Check if the other player is still playing
                         const opponent = (ws === currentRoom.player1) ? currentRoom.player2 : currentRoom.player1;
-                        console.log(`Player ${ws.playerNumber} in room ${ws.roomId} lost.`);
-                        ws.lost = true; // Mark this player as having lost
-                        // Notify opponent they won
-                        broadcastToOpponent(ws, {
-                            type: 'opponent_lost'
-                        }, true);
-                        // Optional: Could clean up the room if both players lost or one disconnected earlier
+                        if (opponent && opponent.readyState === WebSocket.OPEN) {
+                            // Notify opponent this player lost
+                            sendMessage(opponent, {
+                                type: 'opponent_game_over',
+                                payload: {
+                                    message: 'Your opponent lost!',
+                                    opponentScore: data.payload.score || 0,
+                                    opponentLines: data.payload.lines || 0
+                                }
+                            });
+                            
+                            // Notify this player their opponent won (only if opponent hasn't also lost)
+                            if (!opponent.lost) {
+                                sendMessage(ws, {
+                                    type: 'game_lost',
+                                    payload: {
+                                        message: 'You lost!',
+                                        opponentScore: 0, // We don't have this info yet
+                                        opponentLines: 0 // We don't have this info yet
+                                    }
+                                });
+                            }
+                        }
+                        
+                        // If both players are done, clean up the room
+                        const allDone = (ws.lost && (opponent ? opponent.lost : true));
+                        if (allDone) {
+                            console.log(`Room ${ws.roomId}: Both players done, removing room.`);
+                            gameRooms.delete(ws.roomId);
+                        }
                         break;
                     }
+                    
+                case 'speed_up':
+                    {
+                        const currentRoom = gameRooms.get(ws.roomId);
+                        if (!currentRoom) { logAndIgnore(ws, data.type); break; }
+                        
+                        console.log(`Room ${ws.roomId}: Player ${ws.playerNumber} sent speed-up attack.`);
+                        const opponent = (ws === currentRoom.player1) ? currentRoom.player2 : currentRoom.player1;
+                        
+                        if (opponent && opponent.readyState === WebSocket.OPEN) {
+                            // Notify opponent about the speed-up attack
+                            sendMessage(opponent, {
+                                type: 'speed_up',
+                                payload: {
+                                    type: 'received',
+                                    duration: data.payload.duration,
+                                    factor: data.payload.factor
+                                }
+                            });
+                            
+                            // Confirm to the sender
+                            sendMessage(ws, {
+                                type: 'speed_up',
+                                payload: { type: 'sent' }
+                            });
+                        }
+                        break;
+                    }
+                    
+                case 'scramble':
+                    {
+                        const currentRoom = gameRooms.get(ws.roomId);
+                        if (!currentRoom) { logAndIgnore(ws, data.type); break; }
+                        
+                        console.log(`Room ${ws.roomId}: Player ${ws.playerNumber} sent scramble attack.`);
+                        const opponent = (ws === currentRoom.player1) ? currentRoom.player2 : currentRoom.player1;
+                        
+                        if (opponent && opponent.readyState === WebSocket.OPEN) {
+                            // Notify opponent about the scramble attack
+                            sendMessage(opponent, {
+                                type: 'scramble',
+                                payload: {
+                                    type: 'received',
+                                    intensity: data.payload.intensity
+                                }
+                            });
+                            
+                            // Confirm to the sender
+                            sendMessage(ws, {
+                                type: 'scramble',
+                                payload: { type: 'sent' }
+                            });
+                        }
+                        break;
+                    }
+
+                case 'cancel_match_search':
+                    if (waitingPlayer === ws) {
+                        console.log("Player cancelled match search");
+                        waitingPlayer = null;
+                        sendMessage(ws, { type: 'status', payload: { message: 'Match search cancelled.' } });
+                    }
+                    break;
 
                 default:
                     // If the message type is unknown or requires a room but the client isn't in one
