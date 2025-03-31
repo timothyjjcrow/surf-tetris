@@ -910,6 +910,15 @@ function clearLines() {
       board.unshift(Array(COLS).fill(0));
     }
 
+    // Update score & lines cleared
+    const points = getLinePoints(linesToClear.length);
+    score += points;
+    linesCleared += linesToClear.length;
+    updateScoreDisplay();
+    
+    // Send updated score to server immediately after clearing lines
+    sendScoreUpdate();
+    
     return linesToClear.length;
   }
   return 0;
@@ -1022,6 +1031,11 @@ function updateScore(score) {
 function updateLines(lines) {
   // Update lines cleared display
   linesElement.textContent = `Lines: ${lines}`;
+}
+
+function updateScoreDisplay() {
+  // Update score display
+  scoreElement.textContent = `Score: ${score}`;
 }
 
 // Show a notification message
@@ -1328,6 +1342,8 @@ function showReturnToMenuButton() {
   // Check if button already exists
   if (document.getElementById('returnToMenuBtn')) return;
   
+  console.log("Creating Return to Menu button");
+  
   const menuBtn = document.createElement('button');
   menuBtn.id = 'returnToMenuBtn';
   menuBtn.innerText = 'Return to Menu';
@@ -1344,9 +1360,25 @@ function showReturnToMenuButton() {
     window.location.href = '/';
   });
   
-  // Add the button to the game container
-  const gameContainer = document.querySelector('.game-container');
+  // Find the appropriate container - try both main game container and board containers
+  let gameContainer = document.querySelector('.game-container');
+  
+  // If game container not found, try parent of canvas
+  if (!gameContainer && mainCanvas) {
+    gameContainer = mainCanvas.parentElement;
+  }
+  
+  // If still not found, use the document body as fallback
+  if (!gameContainer) {
+    console.warn("Game container not found, appending to body");
+    gameContainer = document.body;
+  }
+  
+  // Add the button to the container
   gameContainer.appendChild(menuBtn);
+  
+  // Make the button more visible
+  menuBtn.style.zIndex = "9999"; 
   
   // Add the style for the button if not already in the document
   if (!document.getElementById('returnBtnStyle')) {
@@ -1383,6 +1415,9 @@ function showReturnToMenuButton() {
     `;
     document.head.appendChild(style);
   }
+  
+  // Force a reflow to ensure the button appears
+  menuBtn.offsetHeight;
 }
 
 // Reset the game for a new match
@@ -1576,3 +1611,8 @@ function startPeriodicScoreUpdates() {
 
 // Initialize score update interval
 let scoreUpdateInterval = null;
+
+function getLinePoints(lines) {
+  const points = [0, 100, 300, 500, 800];
+  return points[lines];
+}
