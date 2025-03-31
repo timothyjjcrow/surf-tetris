@@ -223,8 +223,18 @@ function connectWebSocket() {
     // Send user ID to server if logged in
     const userId = localStorage.getItem('tetris_user_id');
     if (userId) {
+      console.log("Sending user authentication to server, ID:", userId);
       sendMessageToServer("user_auth", { userId: userId });
-      console.log("Sent user authentication to server");
+      
+      // Retry authentication after 2 seconds just to be safe
+      setTimeout(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          console.log("Resending user authentication (retry)");
+          sendMessageToServer("user_auth", { userId: userId });
+        }
+      }, 2000);
+    } else {
+      console.log("No user ID found in localStorage - user not logged in");
     }
   };
 
@@ -255,6 +265,7 @@ function connectWebSocket() {
     ws = null; // Clear the WebSocket object
   };
 }
+
 function sendMessageToServer(type, payload) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     const message = JSON.stringify({ type, payload });
@@ -308,7 +319,12 @@ function handleServerMessage(message) {
       console.log("Opponent lost! You win!");
       gameWon = true; // Set the win flag
       updateStatus("YOU WIN!");
+      
+      // Forcefully insert return to menu button multiple ways for winner
       insertReturnToMenuButton();
+      setTimeout(insertReturnToMenuButton, 500); // Try again after a short delay
+      setTimeout(forceButtonCreation, 1000); // Try with another method as fallback
+      
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
@@ -424,6 +440,10 @@ function handleServerMessage(message) {
       const winnerLines = message.payload.opponentLines || 0;
       updateStatus(`You lost! Opponent score: ${winnerScore}, lines: ${winnerLines}`);
       showReturnToMenuButton(); // Add return to menu button when player loses
+      break;
+
+    case "auth_confirmed":
+      console.log("Authentication confirmed by server for user ID:", message.payload.userId);
       break;
 
     default:
@@ -1086,6 +1106,15 @@ function gameLoop(timestamp = 0) {
     if (incomingGarbageLines > 0) {
       renderer.drawPendingGarbageIndicator(incomingGarbageLines);
     }
+    
+    // If game is over or won, ensure return button is visible
+    if (gameWon) {
+      // Check if button exists, if not create it
+      if (!document.getElementById('returnToMenuBtn') && !document.getElementById('winner-return-btn')) {
+        console.log("Draw function detected game won but no return button - creating one");
+        forceButtonCreation();
+      }
+    }
   }
 
   // Request next frame
@@ -1323,8 +1352,19 @@ function checkGameOver() {
     gameOver = true;
     if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
       // Only send if connected and game has started
-      sendMessageToServer("game_over", { score, linesCleared });
-      console.log("Sent 'game_over' message to server.");
+      const userId = localStorage.getItem('tetris_user_id');
+      const payload = { 
+        score: score, 
+        linesCleared: linesCleared
+      };
+      
+      if (userId) {
+        payload.userId = userId;
+        console.log("Sending game_over with user ID:", userId);
+      }
+      
+      sendMessageToServer("game_over", payload);
+      console.log("Sent 'game_over' message to server with payload:", payload);
     }
     updateStatus("Game Over!");
     showReturnToMenuButton();
@@ -1385,7 +1425,10 @@ function insertReturnToMenuButton() {
   // Add to document body directly (most reliable)
   document.body.appendChild(menuBtn);
   
-  console.log("Return to Menu button inserted into DOM");
+  console.log("Return to Menu button forcefully added");
+  
+  // Try to move it to the front
+  document.body.appendChild(menuBtn);
 }
 
 // Call the original function as a fallback
@@ -1592,4 +1635,49 @@ function cancelMatchSearch() {
   }
   searchingForMatch = false;
   enableStartScreen();
+}
+
+// Last resort method to force button creation for the winner
+function forceButtonCreation() {
+  console.log("LAST RESORT: Creating button directly in document body");
+  
+  // Create button with very aggressive styling
+  const btn = document.createElement('button');
+  btn.textContent = 'Return to Menu';
+  btn.id = 'winner-return-btn';
+  
+  // Set extreme z-index and fixed position
+  Object.assign(btn.style, {
+    position: 'fixed',
+    zIndex: '999999',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    backgroundColor: '#ff4500', // Bright orange to be super visible
+    color: 'white',
+    fontSize: '24px',
+    padding: '20px 40px',
+    border: '3px solid white',
+    borderRadius: '8px',
+    boxShadow: '0 0 20px rgba(0,0,0,0.5)',
+    cursor: 'pointer'
+  });
+  
+  // Add click event
+  btn.onclick = function() {
+    window.location.href = '/';
+  };
+  
+  // First remove any existing button
+  const existingBtn = document.getElementById('winner-return-btn');
+  if (existingBtn) {
+    existingBtn.remove();
+  }
+  
+  // Append directly to body
+  document.body.appendChild(btn);
+  console.log("Winner return button forcefully added");
+  
+  // Try to move it to the front
+  document.body.appendChild(btn);
 }

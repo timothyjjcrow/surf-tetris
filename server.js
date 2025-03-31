@@ -386,6 +386,23 @@ wss.on('connection', (ws) => {
                     if (data.payload && data.payload.userId) {
                         ws.userId = data.payload.userId;
                         console.log(`User authenticated: ${ws.userId}`);
+                        
+                        // Confirm authentication to client
+                        sendMessage(ws, {
+                            type: 'auth_confirmed',
+                            payload: { 
+                                message: 'Authentication successful',
+                                userId: ws.userId
+                            }
+                        });
+                        
+                        // Debug log all authenticated clients
+                        console.log('Currently authenticated clients:');
+                        wss.clients.forEach(client => {
+                            if (client.userId) {
+                                console.log(`- Client ${client.id}: User ID ${client.userId}`);
+                            }
+                        });
                     }
                     break;
 

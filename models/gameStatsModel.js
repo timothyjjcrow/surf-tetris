@@ -21,40 +21,61 @@ const gameStatsModel = {
   
   // Record match results and update player stats
   async recordMatchResult(player1Id, player2Id, winnerId, matchData) {
-    const client = await db.pool.connect();
-    
+    let client;
     try {
-      await client.query('BEGIN');
+      console.log('==== RECORDING MATCH RESULT ====');
+      console.log(`Player 1 ID: ${player1Id}`);
+      console.log(`Player 2 ID: ${player2Id}`);
+      console.log(`Winner ID: ${winnerId}`);
+      console.log('Match data:', matchData);
       
-      // Get current player stats
+      client = await db.pool.connect();
+      console.log('Connected to database');
+      
+      await client.query('BEGIN');
+      console.log('Transaction started');
+      
+      // Check if player stats exist and create them if they don't
+      // Player 1
+      const player1CheckResult = await client.query(
+        'SELECT COUNT(*) FROM player_stats WHERE user_id = $1',
+        [player1Id]
+      );
+      
+      if (parseInt(player1CheckResult.rows[0].count) === 0) {
+        console.log(`Creating new stats record for player ${player1Id}`);
+        await client.query(
+          'INSERT INTO player_stats (user_id, elo_rating, wins, losses) VALUES ($1, 1200, 0, 0)',
+          [player1Id]
+        );
+      }
+      
+      // Player 2
+      const player2CheckResult = await client.query(
+        'SELECT COUNT(*) FROM player_stats WHERE user_id = $1',
+        [player2Id]
+      );
+      
+      if (parseInt(player2CheckResult.rows[0].count) === 0) {
+        console.log(`Creating new stats record for player ${player2Id}`);
+        await client.query(
+          'INSERT INTO player_stats (user_id, elo_rating, wins, losses) VALUES ($1, 1200, 0, 0)',
+          [player2Id]
+        );
+      }
+      
+      // Now get the current stats
       const player1StatsResult = await client.query(
         'SELECT elo_rating, wins, losses FROM player_stats WHERE user_id = $1',
         [player1Id]
       );
+      console.log('Player 1 stats retrieved:', player1StatsResult.rows[0]);
       
       const player2StatsResult = await client.query(
         'SELECT elo_rating, wins, losses FROM player_stats WHERE user_id = $1',
         [player2Id]
       );
-      
-      // Initialize player stats if they don't exist
-      if (player1StatsResult.rows.length === 0) {
-        console.log(`Creating new player stats for player1 (${player1Id})`);
-        await client.query(
-          'INSERT INTO player_stats (user_id, elo_rating, wins, losses) VALUES ($1, 1200, 0, 0)',
-          [player1Id]
-        );
-        player1StatsResult.rows = [{ elo_rating: 1200, wins: 0, losses: 0 }];
-      }
-      
-      if (player2StatsResult.rows.length === 0) {
-        console.log(`Creating new player stats for player2 (${player2Id})`);
-        await client.query(
-          'INSERT INTO player_stats (user_id, elo_rating, wins, losses) VALUES ($1, 1200, 0, 0)',
-          [player2Id]
-        );
-        player2StatsResult.rows = [{ elo_rating: 1200, wins: 0, losses: 0 }];
-      }
+      console.log('Player 2 stats retrieved:', player2StatsResult.rows[0]);
       
       const player1Stats = player1StatsResult.rows[0];
       const player2Stats = player2StatsResult.rows[0];
@@ -66,69 +87,72 @@ const gameStatsModel = {
         const eloChanges = this.calculateEloChange(player1Stats.elo_rating, player2Stats.elo_rating);
         player1EloChange = eloChanges.winnerChange;
         player2EloChange = eloChanges.loserChange;
+        console.log(`Player 1 won. ELO change: +${player1EloChange}, Player 2: ${player2EloChange}`);
       } else {
         const eloChanges = this.calculateEloChange(player2Stats.elo_rating, player1Stats.elo_rating);
         player1EloChange = eloChanges.loserChange;
         player2EloChange = eloChanges.winnerChange;
+        console.log(`Player 2 won. ELO change: Player 1: ${player1EloChange}, Player 2: +${player2EloChange}`);
       }
       
       // Update player1 stats
       await client.query(
-        `UPDATE player_stats SET 
-          elo_rating = elo_rating + $1,
-          wins = CASE WHEN $2 = $3 THEN wins + 1 ELSE wins END,
-          losses = CASE WHEN $2 != $3 THEN losses + 1 ELSE losses END,
-          games_played = games_played + 1,
-          highest_score = GREATEST(highest_score, $4),
-          most_lines_cleared = GREATEST(most_lines_cleared, $5)
-        WHERE user_id = $2`,
-        [player1EloChange, player1Id, winnerId, matchData.player1_score, matchData.player1_lines]
+        'UPDATE player_stats SET elo_rating = $1, wins = $2, losses = $3 WHERE user_id = $4',
+        [
+          player1Stats.elo_rating + player1EloChange,
+          winnerId === player1Id ? player1Stats.wins + 1 : player1Stats.wins,
+          winnerId !== player1Id ? player1Stats.losses + 1 : player1Stats.losses,
+          player1Id
+        ]
       );
+      console.log('Player 1 stats updated');
       
       // Update player2 stats
       await client.query(
-        `UPDATE player_stats SET 
-          elo_rating = elo_rating + $1,
-          wins = CASE WHEN $2 = $3 THEN wins + 1 ELSE wins END,
-          losses = CASE WHEN $2 != $3 THEN losses + 1 ELSE losses END,
-          games_played = games_played + 1,
-          highest_score = GREATEST(highest_score, $4),
-          most_lines_cleared = GREATEST(most_lines_cleared, $5)
-        WHERE user_id = $2`,
-        [player2EloChange, player2Id, winnerId, matchData.player2_score, matchData.player2_lines]
-      );
-      
-      // Record match in history
-      await client.query(
-        `INSERT INTO match_history (
-          player1_id, player2_id, winner_id, 
-          player1_score, player2_score, 
-          player1_lines, player2_lines,
-          player1_elo_change, player2_elo_change,
-          match_duration, room_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        'UPDATE player_stats SET elo_rating = $1, wins = $2, losses = $3 WHERE user_id = $4',
         [
-          player1Id, player2Id, winnerId,
-          matchData.player1_score, matchData.player2_score,
-          matchData.player1_lines, matchData.player2_lines,
-          player1EloChange, player2EloChange,
-          matchData.duration, matchData.room_id
+          player2Stats.elo_rating + player2EloChange,
+          winnerId === player2Id ? player2Stats.wins + 1 : player2Stats.wins,
+          winnerId !== player2Id ? player2Stats.losses + 1 : player2Stats.losses,
+          player2Id
         ]
       );
+      console.log('Player 2 stats updated');
+      
+      // Record the match in match_history
+      await client.query(
+        `INSERT INTO match_history 
+         (winner_id, loser_id, winner_score, loser_score, winner_lines, loser_lines, winner_elo_change, loser_elo_change, match_date) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+        [
+          winnerId,
+          winnerId === player1Id ? player2Id : player1Id,
+          matchData.winnerScore,
+          matchData.loserScore,
+          matchData.winnerLines,
+          matchData.loserLines,
+          winnerId === player1Id ? player1EloChange : player2EloChange,
+          winnerId === player1Id ? player2EloChange : player1EloChange
+        ]
+      );
+      console.log('Match recorded in history');
       
       await client.query('COMMIT');
+      console.log('Transaction committed successfully');
       
-      return { 
-        success: true, 
-        player1EloChange, 
-        player2EloChange 
-      };
+      return { success: true };
     } catch (error) {
-      await client.query('ROLLBACK');
       console.error('Error recording match result:', error);
-      return { success: false, error: 'Failed to record match result' };
+      try {
+        if (client) await client.query('ROLLBACK');
+        console.log('Transaction rolled back due to error');
+      } catch (rollbackError) {
+        console.error('Error rolling back transaction:', rollbackError);
+      }
+      return { success: false, error: error.message };
     } finally {
-      client.release();
+      if (client) client.release();
+      console.log('Database client released');
     }
   },
   
