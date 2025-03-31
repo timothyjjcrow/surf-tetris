@@ -301,6 +301,7 @@ function handleServerMessage(message) {
       console.log("Opponent lost! You win!");
       gameWon = true; // Set the win flag
       updateStatus("YOU WIN!");
+      showReturnToMenuButton(); // Add return to menu button on win
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
@@ -310,6 +311,7 @@ function handleServerMessage(message) {
     case "opponent_disconnected":
       console.log("Opponent disconnected! You win by default.");
       updateStatus("Opponent disconnected. You Win!");
+      showReturnToMenuButton(); // Add return to menu button when opponent disconnects
       gameOver = true; // Stop local game
       gameStarted = false;
       if (ws) ws.close(); // Close connection cleanly
@@ -414,6 +416,7 @@ function handleServerMessage(message) {
       const winnerScore = message.payload.opponentScore || 0;
       const winnerLines = message.payload.opponentLines || 0;
       updateStatus(`You lost! Opponent score: ${winnerScore}, lines: ${winnerLines}`);
+      showReturnToMenuButton(); // Add return to menu button when player loses
       break;
 
     default:
@@ -1300,6 +1303,7 @@ function checkGameOver() {
       console.log("Sent 'game_over' message to server.");
     }
     updateStatus("Game Over!");
+    showReturnToMenuButton();
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
       animationFrameId = null;
@@ -1307,6 +1311,68 @@ function checkGameOver() {
     return true; // Indicate game is over
   }
   return false; // Indicate game is not over
+}
+
+// Function to create and show the Return to Menu button
+function showReturnToMenuButton() {
+  // Check if button already exists
+  if (document.getElementById('returnToMenuBtn')) return;
+  
+  const menuBtn = document.createElement('button');
+  menuBtn.id = 'returnToMenuBtn';
+  menuBtn.innerText = 'Return to Menu';
+  menuBtn.classList.add('return-to-menu-btn');
+  
+  // Add event listener to return to menu
+  menuBtn.addEventListener('click', function() {
+    window.location.href = '/'; // Return to index.html
+  });
+  
+  // Add touch event listeners for mobile
+  menuBtn.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    window.location.href = '/';
+  });
+  
+  // Add the button to the game container
+  const gameContainer = document.querySelector('.game-container');
+  gameContainer.appendChild(menuBtn);
+  
+  // Add the style for the button if not already in the document
+  if (!document.getElementById('returnBtnStyle')) {
+    const style = document.createElement('style');
+    style.id = 'returnBtnStyle';
+    style.innerHTML = `
+      .return-to-menu-btn {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 15px 30px;
+        background-color: #4CAF50;
+        color: white;
+        font-size: 18px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        z-index: 1000;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      }
+      
+      .return-to-menu-btn:hover {
+        background-color: #3e8e41;
+      }
+      
+      /* Mobile-specific styling */
+      @media screen and (max-width: 767px) {
+        .return-to-menu-btn {
+          padding: 20px 40px;
+          font-size: 22px;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
 }
 
 // Reset the game for a new match
