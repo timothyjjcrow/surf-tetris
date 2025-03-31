@@ -97,7 +97,7 @@ const gameStatsModel = {
       
       // Update player1 stats
       await client.query(
-        'UPDATE player_stats SET elo_rating = $1, wins = $2, losses = $3 WHERE user_id = $4',
+        'UPDATE player_stats SET elo_rating = $1, wins = $2, losses = $3, games_played = wins + losses + 1 WHERE user_id = $4',
         [
           player1Stats.elo_rating + player1EloChange,
           winnerId === player1Id ? player1Stats.wins + 1 : player1Stats.wins,
@@ -109,7 +109,7 @@ const gameStatsModel = {
       
       // Update player2 stats
       await client.query(
-        'UPDATE player_stats SET elo_rating = $1, wins = $2, losses = $3 WHERE user_id = $4',
+        'UPDATE player_stats SET elo_rating = $1, wins = $2, losses = $3, games_played = wins + losses + 1 WHERE user_id = $4',
         [
           player2Stats.elo_rating + player2EloChange,
           winnerId === player2Id ? player2Stats.wins + 1 : player2Stats.wins,
@@ -122,9 +122,11 @@ const gameStatsModel = {
       // Record the match in match_history
       await client.query(
         `INSERT INTO match_history 
-         (winner_id, loser_id, winner_score, loser_score, winner_lines, loser_lines, winner_elo_change, loser_elo_change, match_date) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+         (player1_id, player2_id, winner_id, loser_id, winner_score, loser_score, winner_lines, loser_lines, winner_elo_change, loser_elo_change, match_date) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
         [
+          player1Id,
+          player2Id,
           winnerId,
           winnerId === player1Id ? player2Id : player1Id,
           matchData.winnerScore,

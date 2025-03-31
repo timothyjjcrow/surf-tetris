@@ -163,7 +163,13 @@
             <p>Win Rate: <span id="profile-winrate"></span>%</p>
         </div>
         
-        <h2>Top Players</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>Top Players</h2>
+            <button id="refresh-leaderboard" style="background-color: #00FF00; color: black; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">
+                Refresh Leaderboard
+            </button>
+        </div>
+        
         <table class="leaderboard">
             <thead>
                 <tr>
@@ -218,12 +224,22 @@
                 window.location.reload();
             });
             
+            // Refresh leaderboard handler
+            document.getElementById('refresh-leaderboard').addEventListener('click', () => {
+                fetchLeaderboard();
+            });
+            
             // Fetch leaderboard data
             fetchLeaderboard();
             
             async function fetchLeaderboard() {
                 try {
-                    const response = await fetch('/api/stats/leaderboard');
+                    // Add cache-busting parameter to prevent browser caching
+                    const response = await fetch('/api/stats/leaderboard?t=' + new Date().getTime());
+                    if (!response.ok) {
+                        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                    }
+                    
                     const leaderboardData = await response.json();
                     
                     if (!Array.isArray(leaderboardData)) {
