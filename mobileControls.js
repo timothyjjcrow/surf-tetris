@@ -10,7 +10,6 @@ export class MobileControlsHandler {
     this.touchStartTime = 0; // To track tap duration
     this.maxTapDuration = 200; // Maximum time (ms) for a touch to be considered a tap
     this.controlsContainer = null;
-    this.swipeControlArea = null;
     this.isMobileDevice = this.detectMobileDevice();
     
     // Continuous movement tracking
@@ -18,6 +17,11 @@ export class MobileControlsHandler {
     this.moveDirection = null;
     this.moveSpeed = 150; // ms between moves when holding
     this.isMoving = false;
+    
+    // Bound methods to maintain context
+    this._handleTouchStart = this.handleTouchStart.bind(this);
+    this._handleTouchMove = this.handleTouchMove.bind(this);
+    this._handleTouchEnd = this.handleTouchEnd.bind(this);
     
     // Initialize mobile controls
     this.initMobileControls();
@@ -41,70 +45,61 @@ export class MobileControlsHandler {
 
   // Initialize mobile controls
   initMobileControls() {
-    // Add touch event listeners to the game canvas for rotate actions
+    // Only set up mobile controls if we're on a mobile device
+    if (!this.isMobileDevice) {
+      // Hide mobile controls on non-mobile devices
+      const mobileControls = document.getElementById('mobileControls');
+      if (mobileControls) {
+        mobileControls.style.display = 'none';
+      }
+      console.log("Not a mobile device, mobile controls disabled");
+      return;
+    }
+    
+    // Clean up any existing event listeners
+    this.removeEventListeners();
+    
+    // Add touch event listeners to the game canvas
     const gameCanvas = document.getElementById('gameCanvas');
     if (gameCanvas) {
-      // Remove any existing event listeners (to avoid duplicates)
-      gameCanvas.removeEventListener('touchstart', this._gameCanvasTouchStart);
-      gameCanvas.removeEventListener('touchend', this._gameCanvasTouchEnd);
+      // Add new event listeners
+      gameCanvas.addEventListener('touchstart', this._handleTouchStart, { passive: false });
+      gameCanvas.addEventListener('touchmove', this._handleTouchMove, { passive: false });
+      gameCanvas.addEventListener('touchend', this._handleTouchEnd, { passive: false });
       
-      // Create bound handlers
-      this._gameCanvasTouchStart = this.handleTouchStart.bind(this, true);
-      this._gameCanvasTouchEnd = this.handleTouchEnd.bind(this, true);
-      
-      // Add touch event listeners with bound context
-      gameCanvas.addEventListener('touchstart', this._gameCanvasTouchStart);
-      gameCanvas.addEventListener('touchend', this._gameCanvasTouchEnd);
+      console.log("Added touch event listeners to game canvas");
+    } else {
+      console.error("Game canvas not found!");
     }
     
-    // Get the swipe control area for movement controls
-    this.swipeControlArea = document.getElementById('swipeControlArea');
-    if (this.swipeControlArea) {
-      // Remove any existing event listeners
-      this.swipeControlArea.removeEventListener('touchstart', this._swipeAreaTouchStart);
-      this.swipeControlArea.removeEventListener('touchmove', this._swipeAreaTouchMove);
-      this.swipeControlArea.removeEventListener('touchend', this._swipeAreaTouchEnd);
-      
-      // Create bound handlers
-      this._swipeAreaTouchStart = this.handleTouchStart.bind(this, false);
-      this._swipeAreaTouchMove = this.handleTouchMove.bind(this, false);
-      this._swipeAreaTouchEnd = this.handleTouchEnd.bind(this, false);
-      
-      // Add listeners
-      this.swipeControlArea.addEventListener('touchstart', this._swipeAreaTouchStart);
-      this.swipeControlArea.addEventListener('touchmove', this._swipeAreaTouchMove);
-      this.swipeControlArea.addEventListener('touchend', this._swipeAreaTouchEnd);
-    }
-    
-    // Get the mobile controls container (hold button)
+    // Get the mobile controls container (now only has Hold button)
     this.controlsContainer = document.getElementById('mobileControls');
     if (this.controlsContainer) {
+      // Show mobile controls
+      this.controlsContainer.style.display = 'flex';
+      
       // Setup the hold button listener
       const holdBtn = document.getElementById('holdBtn');
       if (holdBtn) {
         this.setupButtonEvents(holdBtn, () => this.gameActions.hold());
       }
     }
-    
-    // Add document-wide touch handlers for everywhere except the game canvas
-    document.addEventListener('touchmove', (e) => {
-      if (e.target !== gameCanvas && 
-          !gameCanvas.contains(e.target) && 
-          this.isMoving) {
-        this.handleTouchMove(false, e);
-      }
-    });
-    
-    document.addEventListener('touchend', (e) => {
-      if (this.isMoving) {
-        this.stopContinuousMovement();
-      }
-    });
+  }
+  
+  // Remove event listeners to avoid duplicates
+  removeEventListeners() {
+    const gameCanvas = document.getElementById('gameCanvas');
+    if (gameCanvas) {
+      gameCanvas.removeEventListener('touchstart', this._handleTouchStart);
+      gameCanvas.removeEventListener('touchmove', this._handleTouchMove);
+      gameCanvas.removeEventListener('touchend', this._handleTouchEnd);
+      console.log("Removed old touch event listeners");
+    }
   }
   
   // Setup both touch and mouse events for a button
   setupButtonEvents(button, callback) {
-    // Remove any existing event listeners (to avoid duplicates)
+    // Remove any existing event listeners
     button.removeEventListener('touchstart', this._touchStartHandler);
     button.removeEventListener('touchend', this._touchEndHandler);
     button.removeEventListener('mousedown', this._mouseDownHandler);
@@ -132,14 +127,16 @@ export class MobileControlsHandler {
     };
     
     // Add new event listeners
-    button.addEventListener('touchstart', this._touchStartHandler);
-    button.addEventListener('touchend', this._touchEndHandler);
+    button.addEventListener('touchstart', this._touchStartHandler, { passive: false });
+    button.addEventListener('touchend', this._touchEndHandler, { passive: false });
     button.addEventListener('mousedown', this._mouseDownHandler);
     button.addEventListener('mouseup', this._mouseUpHandler);
   }
 
   // Handle touch start
-  handleTouchStart(isGameCanvas, e) {
+  handleTouchStart(e) {
+    console.log("Touch start detected");
+    
     // Stop any existing movement
     this.stopContinuousMovement();
     
@@ -147,14 +144,14 @@ export class MobileControlsHandler {
     this.touchStartX = e.touches[0].clientX;
     this.touchStartY = e.touches[0].clientY;
     this.touchStartTime = Date.now();
-    this.isTap = isGameCanvas; // Only track taps on the game canvas
+    this.isTap = true; // Initially assume this might be a tap
     
-    // Prevent default behavior
+    // Prevent default behavior to avoid scrolling
     e.preventDefault();
   }
 
   // Handle touch move for swipe detection
-  handleTouchMove(isGameCanvas, e) {
+  handleTouchMove(e) {
     if (!this.touchStartX || !this.touchStartY) {
       return;
     }
@@ -167,8 +164,10 @@ export class MobileControlsHandler {
     const diffX = touchX - this.touchStartX;
     const diffY = touchY - this.touchStartY;
     
+    console.log(`Touch move: diffX=${diffX}, diffY=${diffY}`);
+    
     // If moved beyond threshold, it's not a tap
-    if (isGameCanvas && (Math.abs(diffX) > 10 || Math.abs(diffY) > 10)) {
+    if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
       this.isTap = false;
     }
     
@@ -181,20 +180,9 @@ export class MobileControlsHandler {
       if (!this.isMoving || this.moveDirection !== direction) {
         this.startContinuousMovement(direction);
       }
-    } else if (!isGameCanvas && Math.abs(diffY) > this.touchThreshold && Math.abs(diffY) > Math.abs(diffX)) {
-      // Vertical swipe on swipe area (not game canvas)
-      if (diffY < 0) {
-        // Swipe up - hard drop
-        this.gameActions.hardDrop();
-        console.log("Swipe up detected in control area - hard drop");
-        
-        // Reset touch tracking to prevent repeated actions
-        this.touchStartX = touchX;
-        this.touchStartY = touchY;
-      }
     }
     
-    // Prevent screen scrolling while swiping
+    // Prevent screen scrolling while swiping on the game canvas
     e.preventDefault();
   }
 
@@ -238,7 +226,9 @@ export class MobileControlsHandler {
   }
 
   // Handle touch end for swipe detection and tap
-  handleTouchEnd(isGameCanvas, e) {
+  handleTouchEnd(e) {
+    console.log("Touch end detected");
+    
     // Stop any continuous movement
     this.stopContinuousMovement();
     
@@ -255,24 +245,16 @@ export class MobileControlsHandler {
     const diffY = touchEndY - this.touchStartY;
     const duration = touchEndTime - this.touchStartTime;
     
-    // Check if it's a tap on the game canvas (for rotation)
-    if (isGameCanvas && this.isTap && duration < this.maxTapDuration) {
+    console.log(`Touch end: diffX=${diffX}, diffY=${diffY}, duration=${duration}ms, isTap=${this.isTap}`);
+    
+    // Check if it's a tap (short touch without much movement)
+    if (this.isTap && duration < this.maxTapDuration) {
       // It's a tap - rotate the piece
       this.gameActions.rotate();
-      console.log("Tap detected on game canvas - rotating piece");
-    } else if (!isGameCanvas) {
-      // Handle swipes in the control area
-      if (Math.abs(diffY) > this.touchThreshold && Math.abs(diffY) > Math.abs(diffX)) {
-        // Vertical swipe in control area
-        if (diffY > 0) {
-          // Swipe down - soft drop
-          this.handleSoftDrop(diffY);
-        } else {
-          // Swipe up - already handled in move to prevent repeats
-        }
-      }
-    } else if (isGameCanvas) {
-      // Handle vertical swipes on game canvas
+      console.log("Tap detected - rotating piece");
+    } else {
+      // It's a swipe - determine direction for vertical swipes only
+      // Horizontal swipes are handled by the continuous movement system
       if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > this.touchThreshold) {
         this.handleVerticalSwipe(diffY);
       }
@@ -283,34 +265,29 @@ export class MobileControlsHandler {
     this.touchStartY = 0;
     this.isTap = false;
     
-    // Prevent default
+    // Prevent default to avoid any unwanted behavior
     e.preventDefault();
-  }
-  
-  // Handle soft drop
-  handleSoftDrop(diffY) {
-    // Swipe down - soft drop with more moderate effect
-    const swipeStrength = Math.floor(Math.abs(diffY) / 80);
-    const repeats = Math.min(Math.max(swipeStrength, 1), 2);
-    
-    console.log(`Swipe down detected - soft drop (strength: ${repeats})`);
-    
-    // Apply soft drop with a moderated effect
-    this.gameActions.softDrop(); // Always call at least once
-    
-    // Add an extra call only for strong swipes
-    if (repeats > 1) {
-      // Small delay to make the effect feel more natural
-      setTimeout(() => {
-        this.gameActions.softDrop();
-      }, 50);
-    }
   }
   
   // Handle vertical swipe
   handleVerticalSwipe(diffY) {
     if (diffY > 0) {
-      this.handleSoftDrop(diffY);
+      // Swipe down - soft drop with more moderate effect
+      const swipeStrength = Math.floor(Math.abs(diffY) / 80);
+      const repeats = Math.min(Math.max(swipeStrength, 1), 2);
+      
+      console.log(`Swipe down detected - soft drop (strength: ${repeats})`);
+      
+      // Apply soft drop with a moderated effect
+      this.gameActions.softDrop(); // Always call at least once
+      
+      // Add an extra call only for strong swipes
+      if (repeats > 1) {
+        // Small delay to make the effect feel more natural
+        setTimeout(() => {
+          this.gameActions.softDrop();
+        }, 50);
+      }
     } else {
       // Swipe up - hard drop
       this.gameActions.hardDrop();
@@ -323,32 +300,12 @@ export class MobileControlsHandler {
     if (this.controlsContainer) {
       this.controlsContainer.style.display = 'flex';
     }
-    
-    if (this.swipeControlArea) {
-      this.swipeControlArea.style.display = 'block';
-    }
-    
-    // Also show mobile instructions if they exist
-    const instructions = document.getElementById('mobileInstructions');
-    if (instructions) {
-      instructions.style.display = 'block';
-    }
   }
 
   // Hide mobile controls
   hide() {
     if (this.controlsContainer) {
       this.controlsContainer.style.display = 'none';
-    }
-    
-    if (this.swipeControlArea) {
-      this.swipeControlArea.style.display = 'none';
-    }
-    
-    // Also hide mobile instructions if they exist
-    const instructions = document.getElementById('mobileInstructions');
-    if (instructions) {
-      instructions.style.display = 'none';
     }
   }
 }

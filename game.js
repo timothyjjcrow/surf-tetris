@@ -105,7 +105,6 @@ let pieceBag = [];
 let pendingGarbageLines = 0;
 let incomingGarbageLines = 0;
 let gameOver = false;
-let gamePaused = false;
 let gameWon = false;
 let gameStarted = false;
 let playerNumber = null;
@@ -320,7 +319,6 @@ function initGameState() {
   
   // Reset status flags
   gameOver = false;
-  gamePaused = false;
   gameWon = false;
   gameStarted = true;
   
@@ -459,7 +457,7 @@ function checkCollision(x, y, shape) {
 
 // --- Movement ---
 function movePiece(dx, dy) {
-  if (gameOver || gamePaused || gameWon || !gameStarted) return false;
+  if (gameOver || gameWon || !gameStarted) return false;
   clearTimeout(lockDelayTimer); // Cancel lock delay on successful move
   lockDelayTimer = null;
 
@@ -503,7 +501,7 @@ function softDrop() {
 }
 
 function hardDrop() {
-  if (gameOver || gamePaused || gameWon || !gameStarted) return;
+  if (gameOver || gameWon || !gameStarted) return;
   clearTimeout(lockDelayTimer);
   lockDelayTimer = null;
   let distance = 0;
@@ -536,7 +534,6 @@ function rotatePiece() {
     !currentPiece ||
     currentPiece.type === "O" ||
     gameOver ||
-    gamePaused ||
     gameWon ||
     !gameStarted
   )
@@ -760,7 +757,7 @@ function clearLines() {
 
 // --- Hold Piece ---
 function holdCurrentPiece() {
-  if (!canHold || gameOver || gamePaused || gameWon || !gameStarted) return;
+  if (!canHold || gameOver || gameWon || !gameStarted) return;
 
   clearTimeout(lockDelayTimer); // Cancel lock delay
   lockDelayTimer = null;
@@ -869,7 +866,7 @@ function updateLines(lines) {
 
 // --- Game Loop ---
 function gameLoop(timestamp = 0) {
-  if (gameOver || gamePaused || gameWon || !gameStarted) {
+  if (gameOver || gameWon || !gameStarted) {
     return; // Skip loop if game is not active
   }
 
@@ -918,27 +915,6 @@ const keyMap = {
   c: holdCurrentPiece, // Change from KeyC to c
   C: holdCurrentPiece, // Also add uppercase C for caps lock
   KeyC: holdCurrentPiece, // Keep original for compatibility
-  KeyP: () => {
-    // Pause Toggle
-    gamePaused = !gamePaused;
-    console.log(gamePaused ? "Game Paused" : "Game Resumed");
-    if (!gamePaused) {
-      lastTime = performance.now(); // Reset timer on unpause
-      gameLoop(); // Restart loop if paused
-    } else {
-      // Optional: Draw a pause overlay
-      gameCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
-      gameCtx.font = '30px Arial';
-      gameCtx.fillStyle = 'white';
-      gameCtx.textAlign = 'center';
-      gameCtx.fillText('Paused', gameCanvas.width / 2, gameCanvas.height / 2);
-    }
-  },
-  KeyR: () => {
-    // Reset Game (Disable in multiplayer?)
-    resetGame();
-  },
 };
 
 // Game actions for mobile controls
@@ -955,7 +931,7 @@ const gameActions = {
 
 document.addEventListener("keydown", (event) => {
   // Ignore input if game not active
-  if (gameOver || gamePaused || gameWon || !gameStarted) return;
+  if (gameOver || gameWon || !gameStarted) return;
 
   if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
     if (!moveKeyDown) {
@@ -1148,7 +1124,6 @@ function resetGame() {
   initOpponentBoard();
   gameWon = false;
   gameOver = false;
-  gamePaused = false;
   
   // Initialize or show mobile controls immediately
   if (!mobileControls) {

@@ -8,7 +8,7 @@
     <style>
         /* Mobile Controls Styling */
         .mobile-controls {
-            display: none; /* Hidden by default */
+            display: none;
             position: absolute;
             bottom: 20px;
             right: 20px;
@@ -38,42 +38,74 @@
             transform: scale(0.95);
         }
         
-        /* Mobile gesture instructions */
-        .mobile-instructions {
-            display: none; /* Hidden by default */
-            position: absolute;
-            top: 5px;
-            left: 0;
-            right: 0;
+        /* Instructions styling */
+        .control-instructions {
+            margin: 20px auto;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            max-width: 450px;
+        }
+        
+        .control-instructions h3 {
+            margin-top: 0;
+            color: #3498db;
             text-align: center;
-            color: white;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 8px;
-            font-size: 12px;
-            z-index: 1000;
+        }
+        
+        .control-instructions .instruction-set {
+            margin-bottom: 10px;
+        }
+        
+        .instruction-set h4 {
+            margin: 5px 0;
+            color: #e74c3c;
+        }
+        
+        .instruction-set ul {
+            margin: 5px 0;
+            padding-left: 20px;
+            list-style-type: none;
+        }
+        
+        .instruction-set li {
+            margin: 3px 0;
+            font-size: 0.9em;
+        }
+        
+        .keyboard-key {
+            display: inline-block;
+            background-color: #34495e;
+            border: 1px solid #7f8c8d;
             border-radius: 4px;
+            padding: 2px 6px;
+            margin: 0 2px;
+            font-family: monospace;
         }
         
-        /* Swipe Control Area Styling */
-        .swipe-control-area {
-            display: none; /* Hidden by default */
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 100px;
-            background-color: transparent; /* Make it invisible */
-            z-index: 1000;
+        /* Responsive adjustments */
+        @media screen and (max-width: 767px) {
+            .desktop-controls {
+                display: none;
+            }
+            
+            .control-instructions {
+                padding: 10px;
+                font-size: 0.9em;
+            }
         }
         
-        /* Only show mobile elements on mobile devices */
+        @media screen and (min-width: 768px) {
+            .mobile-controls-info {
+                display: none;
+            }
+        }
+        
+        /* Force show mobile controls on mobile devices */
         @media screen and (max-width: 800px), 
                (orientation: portrait), 
-               (max-device-width: 800px),
-               (hover: none) and (pointer: coarse) {
-            .mobile-controls,
-            .mobile-instructions,
-            .swipe-control-area {
+               (max-device-width: 800px) {
+            .mobile-controls, .mobile-instructions {
                 display: flex !important;
             }
         }
@@ -95,6 +127,35 @@
         <div id="privateRoomInfo" style="margin-top: 15px; font-weight: bold; display: none;">
             <!-- Room code will be displayed here -->
         </div>
+        
+        <!-- Control Instructions -->
+        <div class="control-instructions">
+            <h3>How to Play</h3>
+            
+            <!-- Desktop controls -->
+            <div class="instruction-set desktop-controls">
+                <h4>Keyboard Controls:</h4>
+                <ul>
+                    <li><span class="keyboard-key">←</span> <span class="keyboard-key">→</span> Move left/right</li>
+                    <li><span class="keyboard-key">↓</span> Soft drop</li>
+                    <li><span class="keyboard-key">↑</span> Rotate piece</li>
+                    <li><span class="keyboard-key">Space</span> Hard drop</li>
+                    <li><span class="keyboard-key">C</span> Hold piece</li>
+                </ul>
+            </div>
+            
+            <!-- Mobile controls -->
+            <div class="instruction-set mobile-controls-info">
+                <h4>Touch Controls:</h4>
+                <ul>
+                    <li><strong>Tap</strong> on screen to rotate</li>
+                    <li><strong>Swipe & hold</strong> left/right to move</li>
+                    <li><strong>Swipe down</strong> to drop faster</li>
+                    <li><strong>Swipe up</strong> to hard drop</li>
+                    <li>Use <strong>HOLD</strong> button to store a piece</li>
+                </ul>
+            </div>
+        </div>
     </div>
 
     <div id="gameArea" class="game-container" style="display: none;"> <!-- Hide game initially -->
@@ -102,29 +163,33 @@
             <h2>Hold</h2>
             <canvas id="holdCanvas" width="120" height="120"></canvas>
         </div>
+        
+        <div class="right-panel">
+            <div class="right-panel-group">
+                <div>
+                    <h2>Next</h2>
+                    <canvas id="nextCanvas" width="120" height="400"></canvas>
+                </div>
+                
+                <div class="score-area">
+                    <div id="score">Score: 0</div>
+                    <div id="lines">Lines: 0</div>
+                </div>
+                
+                <div>
+                    <h2>Opponent</h2>
+                    <canvas id="opponentCanvas" width="240" height="480"></canvas>
+                </div>
+            </div>
+        </div>
+        
         <div class="main-game-area">
             <canvas id="gameCanvas" width="300" height="600"></canvas>
             
-            <!-- Mobile gesture instructions -->
-            <div id="mobileInstructions" class="mobile-instructions">
-                Tap to rotate • Swipe & hold left/right to move • Swipe down to drop • Swipe up to hard drop
-            </div>
-            
             <!-- Mobile Controls (Only Hold button) -->
-            <div id="mobileControls" class="mobile-controls">
+            <div id="mobileControls" class="mobile-controls" style="display: none !important;">
                 <button id="holdBtn" class="mobile-control-btn">HOLD</button>
             </div>
-            
-            <!-- Swipe Control Area for bottom of screen -->
-            <div id="swipeControlArea" class="swipe-control-area"></div>
-        </div>
-        <div class="right-panel">
-            <h2>Next</h2>
-            <canvas id="nextCanvas" width="120" height="400"></canvas>
-            <div id="score">Score: 0</div>
-            <div id="lines">Lines: 0</div>
-            <h2>Opponent</h2>
-            <canvas id="opponentCanvas" width="240" height="480"></canvas>
         </div>
     </div>
 
