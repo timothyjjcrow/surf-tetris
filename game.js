@@ -80,7 +80,7 @@ let renderer = null;
 
 // UI Elements
 const statusElement = document.getElementById("status");
-const startScreenElement = document.getElementById("startScreen");
+const startScreen = document.getElementById("startScreen");
 const gameAreaElement = document.getElementById("gameArea");
 
 // Start screen buttons
@@ -282,7 +282,7 @@ function handleServerMessage(message) {
       updateStatus(message.payload.message);
       // Keep start screen enabled unless matchmaking is actively in progress
       // (disableStartScreen is called explicitly when sending match requests)
-      if (!gameStarted && startScreenElement.style.display !== "none") {
+      if (!gameStarted && startScreen.style.display !== "none") {
         // Don't re-enable if we're *already* disabled waiting for match_found
         const anyButtonDisabled =
           playPublicButton.disabled ||
@@ -991,7 +991,7 @@ function startMovement(key) {
 
 // --- Start Screen Flow ---
 function showStartScreen() {
-  startScreenElement.style.display = "flex"; // Use flex as set in CSS
+  startScreen.style.display = "flex"; // Use flex as set in CSS
   gameAreaElement.style.display = "none";
   privateRoomInfo.style.display = "none"; // Hide room code info
   roomCodeInput.value = ""; // Clear input
@@ -999,7 +999,7 @@ function showStartScreen() {
 }
 
 function hideStartScreen() {
-  startScreenElement.style.display = "none";
+  startScreen.style.display = "none";
 }
 
 function showGameArea() {
@@ -1026,12 +1026,19 @@ function disableStartScreen(reason = "") {
   roomCodeInput.disabled = true;
 }
 
-// Enable buttons/input
 function enableStartScreen() {
+  startScreen.style.display = "block";
+  
+  // Re-enable all buttons
   playPublicButton.disabled = false;
   createPrivateButton.disabled = false;
   joinPrivateButton.disabled = false;
   roomCodeInput.disabled = false;
+  
+  // Reset button styling
+  playPublicButton.style.opacity = "1";
+  playPublicButton.style.cursor = "pointer";
+  
   searchingForMatch = false; // Reset search state when enabling start screen
 }
 
@@ -1049,6 +1056,11 @@ function handlePlayPublic() {
     return;
   }
   
+  // Immediately disable the button to prevent multiple clicks
+  playPublicButton.disabled = true;
+  playPublicButton.style.opacity = "0.5";
+  playPublicButton.style.cursor = "not-allowed";
+  
   searchingForMatch = true;
   updateStatus("Connecting to server...");
   disableStartScreen();
@@ -1061,6 +1073,11 @@ function handlePlayPublic() {
     if (ws && ws.readyState === WebSocket.OPEN) {
       sendMessageToServer("find_public_match");
       updateStatus("Finding opponent...");
+      
+      // Ensure button remains disabled
+      playPublicButton.disabled = true;
+      playPublicButton.style.opacity = "0.5";
+      playPublicButton.style.cursor = "not-allowed";
     } else {
       updateStatus("Connection failed. Try again.");
       searchingForMatch = false; // Reset search state
