@@ -34,32 +34,14 @@
         </div>
         <div class="right-panel">
             <h2>Next</h2>
-            <canvas id="nextCanvas" width="120" height="240"></canvas>
-            <!-- Opponent board will be added here by JS -->
+            <canvas id="nextCanvas" width="120" height="400"></canvas>
             <div id="score">Score: 0</div>
             <div id="lines">Lines: 0</div>
+            <h2>Opponent</h2>
+            <canvas id="opponentCanvas" width="240" height="480"></canvas>
         </div>
     </div>
 
-    <!-- Touch Controls (Initially Hidden) -->
-    <div id="touchControlsContainer" style="display: none;"> <!-- Outer container for visibility -->
-        <div class="touch-controls">
-            <!-- Left Side: Movement -->
-            <div class="touch-group touch-movement">
-                <button id="touchLeft" class="touch-button">◀</button>
-                <button id="touchRight" class="touch-button">▶</button>
-                <button id="touchDown" class="touch-button">▼</button> <!-- Soft Drop -->
-            </div>
-
-            <!-- Center/Right Side: Actions -->
-            <div class="touch-group touch-actions">
-                <button id="touchDrop" class="touch-button">DROP</button> <!-- Hard Drop -->
-                <button id="touchRotate" class="touch-button"> ROTATE </button>
-                <button id="touchHold" class="touch-button">HOLD</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="game.js"></script>
+    <script src="game.js" type="module"></script>
 </body>
 </html>

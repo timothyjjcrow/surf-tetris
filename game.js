@@ -1,270 +1,112 @@
+// --- Import Renderer and Constants ---
+import { GameRenderer } from './renderer.js';
+import {
+  COLS,
+  ROWS,
+  BLOCK_SIZE,
+  HIDDEN_ROWS,
+  TOTAL_ROWS,
+  NEXT_QUEUE_SIZE,
+  PREVIEW_BOX_SIZE,
+  OPPONENT_COLS,
+  OPPONENT_ROWS,
+  OPPONENT_HIDDEN_ROWS,
+  OPPONENT_TOTAL_ROWS,
+  OPPONENT_BLOCK_SIZE,
+  LOCK_DELAY,
+  INITIAL_DROP_INTERVAL,
+  COLORS,
+  SHAPES,
+  SRS_KICKS
+} from './constants.js';
+
 // --- DOM Elements ---
 const gameCanvas = document.getElementById("gameCanvas");
 const holdCanvas = document.getElementById("holdCanvas");
 const nextCanvas = document.getElementById("nextCanvas");
+const opponentCanvas = document.getElementById("opponentCanvas"); // Get the existing canvas instead of creating a new one
 const scoreElement = document.getElementById("score");
 const linesElement = document.getElementById("lines");
-const opponentCanvas = document.createElement("canvas"); // Create opponent canvas
 
+// Initialize canvas dimensions
+document.addEventListener('DOMContentLoaded', () => {
+  // Main game board
+  gameCanvas.width = COLS * BLOCK_SIZE;
+  gameCanvas.height = ROWS * BLOCK_SIZE;
+  
+  // Hold display
+  holdCanvas.width = PREVIEW_BOX_SIZE * (BLOCK_SIZE / 1.5);
+  holdCanvas.height = PREVIEW_BOX_SIZE * (BLOCK_SIZE / 1.5);
+  
+  // Next queue display
+  nextCanvas.width = PREVIEW_BOX_SIZE * (BLOCK_SIZE / 1.5);
+  nextCanvas.height = NEXT_QUEUE_SIZE * PREVIEW_BOX_SIZE * (BLOCK_SIZE / 2);
+  
+  // Opponent display
+  opponentCanvas.width = OPPONENT_COLS * OPPONENT_BLOCK_SIZE;
+  opponentCanvas.height = OPPONENT_ROWS * OPPONENT_BLOCK_SIZE;
+  
+  // Initialize renderer
+  renderer = new GameRenderer(gameCanvas, holdCanvas, nextCanvas, opponentCanvas);
+  
+  // Set up start screen
+  showStartScreen();
+});
+
+// --- Initial rendering contexts ---
 const gameCtx = gameCanvas.getContext("2d");
 const holdCtx = holdCanvas.getContext("2d");
 const nextCtx = nextCanvas.getContext("2d");
+const opponentCtx = opponentCanvas.getContext("2d");
+
+// Create renderer instance
+let renderer = null;
 
 // UI Elements
 const statusElement = document.getElementById("status");
 const startScreenElement = document.getElementById("startScreen");
 const gameAreaElement = document.getElementById("gameArea");
+
+// Start screen buttons
 const playPublicButton = document.getElementById("playPublicButton");
 const createPrivateButton = document.getElementById("createPrivateButton");
 const joinPrivateButton = document.getElementById("joinPrivateButton");
 const roomCodeInput = document.getElementById("roomCodeInput");
 const privateRoomInfo = document.getElementById("privateRoomInfo");
 
-// --- Game Constants ---
-const COLS = 10;
-const ROWS = 20;
-const BLOCK_SIZE = 24; // Size of each block in pixels
-const HIDDEN_ROWS = 2; // Buffer rows above visible area
-const TOTAL_ROWS = ROWS + HIDDEN_ROWS;
-const NEXT_QUEUE_SIZE = 4;
-const PREVIEW_BOX_SIZE = 4; // Size of next/hold box in blocks (e.g., 4x4)
-
-// Opponent display constants
-const OPPONENT_COLS = 10;
-const OPPONENT_ROWS = 20;
-const OPPONENT_HIDDEN_ROWS = 2; // Match main board's hidden rows
-const OPPONENT_TOTAL_ROWS = OPPONENT_ROWS + OPPONENT_HIDDEN_ROWS;
-const OPPONENT_BLOCK_SIZE = 12; // Make opponent blocks smaller
-
-// Adjust canvas size based on constants
-gameCanvas.width = COLS * BLOCK_SIZE;
-gameCanvas.height = ROWS * BLOCK_SIZE;
-holdCanvas.width = PREVIEW_BOX_SIZE * BLOCK_SIZE;
-holdCanvas.height = PREVIEW_BOX_SIZE * BLOCK_SIZE;
-nextCanvas.width = PREVIEW_BOX_SIZE * BLOCK_SIZE;
-nextCanvas.height = PREVIEW_BOX_SIZE * BLOCK_SIZE * NEXT_QUEUE_SIZE; // Adjust height for queue
-
-opponentCanvas.width = OPPONENT_COLS * OPPONENT_BLOCK_SIZE;
-opponentCanvas.height = OPPONENT_ROWS * OPPONENT_BLOCK_SIZE;
-
-// --- Colors ---
-const COLORS = {
-  I: "cyan",
-  O: "yellow",
-  T: "purple",
-  S: "lime",
-  Z: "red",
-  J: "blue",
-  L: "orange",
-  GHOST: "rgba(200, 200, 200, 0.5)", // Semi-transparent gray
-  GRID: "#ddd", // Light gray for grid lines
-  GARBAGE: "darkgray",
-};
-
-// --- Tetrimino Shapes & Data ---
-// Shapes are defined assuming the top-left of the bounding box is (0,0)
-// This might differ slightly from spawn calculation which centers.
-const SHAPES = {
-  I: [
-    [0, 0, 0, 0],
-    [1, 1, 1, 1],
-    [0, 0, 0, 0],
-    [0, 0, 0, 0],
-  ],
-  O: [
-    [1, 1],
-    [1, 1],
-  ],
-  T: [
-    [0, 1, 0],
-    [1, 1, 1],
-    [0, 0, 0],
-  ],
-  S: [
-    [0, 1, 1],
-    [1, 1, 0],
-    [0, 0, 0],
-  ],
-  Z: [
-    [1, 1, 0],
-    [0, 1, 1],
-    [0, 0, 0],
-  ],
-  J: [
-    [1, 0, 0],
-    [1, 1, 1],
-    [0, 0, 0],
-  ],
-  L: [
-    [0, 0, 1],
-    [1, 1, 1],
-    [0, 0, 0],
-  ],
-};
-
-// SRS Kick Data (Offsets from original position for wall kicks)
-// Format: [ [Test 1 dx, dy], [Test 2 dx, dy], ... ]
-// Based on https://tetris.wiki/Super_Rotation_System
-const SRS_KICKS = {
-  // J, L, S, T, Z kicks (Common)
-  JLSTZ: {
-    // Rotation state transitions: 0->1, 1->0, 1->2, 2->1, 2->3, 3->2, 3->0, 0->3 (last one is CCW)
-    "0->1": [
-      [0, 0],
-      [-1, 0],
-      [-1, +1],
-      [0, -2],
-      [-1, -2],
-    ],
-    "1->0": [
-      [0, 0],
-      [+1, 0],
-      [+1, -1],
-      [0, +2],
-      [+1, +2],
-    ], // Reverse of 0->1
-    "1->2": [
-      [0, 0],
-      [+1, 0],
-      [+1, -1],
-      [0, +2],
-      [+1, +2],
-    ],
-    "2->1": [
-      [0, 0],
-      [-1, 0],
-      [-1, +1],
-      [0, -2],
-      [-1, -2],
-    ], // Reverse of 1->2
-    "2->3": [
-      [0, 0],
-      [+1, 0],
-      [+1, +1],
-      [0, -2],
-      [+1, -2],
-    ],
-    "3->2": [
-      [0, 0],
-      [-1, 0],
-      [-1, -1],
-      [0, +2],
-      [-1, +2],
-    ], // Reverse of 2->3
-    "3->0": [
-      [0, 0],
-      [-1, 0],
-      [-1, -1],
-      [0, +2],
-      [-1, +2],
-    ],
-    "0->3": [
-      [0, 0],
-      [+1, 0],
-      [+1, +1],
-      [0, -2],
-      [+1, -2],
-    ], // Reverse of 3->0 (CCW)
-  },
-  // I piece kicks
-  I: {
-    "0->1": [
-      [0, 0],
-      [-2, 0],
-      [+1, 0],
-      [-2, -1],
-      [+1, +2],
-    ],
-    "1->0": [
-      [0, 0],
-      [+2, 0],
-      [-1, 0],
-      [+2, +1],
-      [-1, -2],
-    ], // Reverse of 0->1
-    "1->2": [
-      [0, 0],
-      [-1, 0],
-      [+2, 0],
-      [-1, +2],
-      [+2, -1],
-    ],
-    "2->1": [
-      [0, 0],
-      [+1, 0],
-      [-2, 0],
-      [+1, -2],
-      [-2, +1],
-    ], // Reverse of 1->2
-    "2->3": [
-      [0, 0],
-      [+2, 0],
-      [-1, 0],
-      [+2, +1],
-      [-1, -2],
-    ],
-    "3->2": [
-      [0, 0],
-      [-2, 0],
-      [+1, 0],
-      [-2, -1],
-      [+1, +2],
-    ], // Reverse of 2->3
-    "3->0": [
-      [0, 0],
-      [+1, 0],
-      [-2, 0],
-      [+1, -2],
-      [-2, +1],
-    ],
-    "0->3": [
-      [0, 0],
-      [-1, 0],
-      [+2, 0],
-      [-1, +2],
-      [+2, -1],
-    ], // Reverse of 3->0 (CCW)
-  },
-  // O piece does not rotate / kick
-};
-
-// --- Game State Variables ---
-let board = []; // Represents the game grid (0 = empty, >0 = filled block color index)
+// --- Game State ---
+let board = [];
+let opponentBoard = [];
 let currentPiece = null;
 let currentX = 0;
 let currentY = 0;
 let score = 0;
 let linesCleared = 0;
-let level = 1;
-let gameOver = false;
-let gamePaused = false;
-let gameStarted = false; // Flag to prevent interaction before match starts
-let playerNumber = null; // 1 or 2, assigned by server
-let roomId = null;
-let gameWon = false; // Flag for winning
-
-let pieceBag = [];
-let nextQueue = [];
 let holdPiece = null;
 let canHold = true;
+let nextQueue = [];
+let pieceBag = [];
+let pendingGarbageLines = 0;
+let incomingGarbageLines = 0;
+let gameOver = false;
+let gamePaused = false;
+let gameWon = false;
+let gameStarted = false;
+let playerNumber = null;
+let opponentLost = false;
+let playerLost = false; 
+let playerWon = false; 
+let roomId = null; 
+let level = 1; // Added missing level variable with initial value
 
-let dropCounter = 0;
-let dropInterval = 1000; // Milliseconds per downward step (decreases with level)
-
+// Animation and timing state
 let lastTime = 0;
-let accumulatedTime = 0;
-let animationFrameId = null; // To stop the loop
-
+let accumulatedTime = 0; 
+let dropInterval = INITIAL_DROP_INTERVAL;
 let lockDelayTimer = null;
-const LOCK_DELAY = 500; // ms
+let animationFrameId = null;
 
-// Garbage State
-let incomingGarbageLines = 0; // Counter for garbage lines to be added on next lock
-
-// Opponent State
-let opponentBoard = [];
-
-// --- WebSocket Connection ---
+// WebSocket connection
 let ws = null;
 const SERVER_URL = `ws://${window.location.hostname}:8080`; // Adjust if server is elsewhere
 
@@ -441,63 +283,41 @@ function handleServerMessage(message) {
 }
 
 // --- Initialization ---
-function initDrawingContexts() {
-  // Renamed from initGameUI for clarity
-  // Add opponent canvas to the DOM
-  const gameContainer = document.querySelector(".game-container");
-  const rightPanel = document.querySelector(".right-panel");
-  opponentCanvas.id = "opponentCanvas";
-  opponentCanvas.style.border = "1px solid #ccc";
-  opponentCanvas.style.backgroundColor = "#f8f8f8";
-  opponentCanvas.style.marginTop = "20px"; // Add some space
-
-  const opponentContainer = document.createElement("div");
-  opponentContainer.style.textAlign = "center";
-  const opponentTitle = document.createElement("h2");
-  opponentTitle.textContent = "Opponent";
-  opponentContainer.appendChild(opponentTitle);
-  opponentContainer.appendChild(opponentCanvas);
-
-  // Insert opponent display before score/lines in the right panel
-  rightPanel.insertBefore(opponentContainer, document.getElementById("score"));
-
-  updateStatus("Connecting to server...");
-  connectWebSocket();
-}
-
-function initBoard() {
+function initGameState() {
+  // Initialize game state variables
   board = Array.from({ length: TOTAL_ROWS }, () => Array(COLS).fill(0));
-  // Example: Pre-fill some blocks for testing
-  // board[TOTAL_ROWS - 1] = Array(COLS).fill(1);
-  // board[TOTAL_ROWS - 2] = Array(COLS).fill(2);
-  // board[TOTAL_ROWS - 3][5] = 3;
-}
-
-function resetGame() {
-  initBoard();
-  score = 0;
-  linesCleared = 0;
-  level = 1;
-  gameOver = false;
-  gamePaused = false;
-  gameStarted = true; // Flag to prevent interaction before match starts
-  pieceBag = [];
-  nextQueue = [];
+  opponentBoard = Array.from({ length: OPPONENT_TOTAL_ROWS }, () => Array(OPPONENT_COLS).fill(0));
+  
+  // Generate initial bag and next queue
+  fillBag();
+  
+  // Reset game state
   holdPiece = null;
   canHold = true;
-  dropInterval = 1000; // Reset speed
-  scoreElement.textContent = `Score: ${score}`;
-  linesElement.textContent = `Lines: ${linesCleared}`;
-  fillBag();
+  score = 0;
+  linesCleared = 0;
+  pendingGarbageLines = 0;
+  incomingGarbageLines = 0;
+  
+  // Reset status flags
+  gameOver = false;
+  gamePaused = false;
+  gameWon = false;
+  gameStarted = true;
+  
+  // Update UI
+  updateScore(score);
+  updateLines(linesCleared);
+  
+  // Spawn first piece
   spawnPiece();
-  lastTime = 0; // Reset animation timer
-  accumulatedTime = 0;
-  console.log("Game Reset and Started");
-  gameLoop(); // Start the game loop
 }
 
-function startGame() {
-  resetGame(); // Reset local game state
+function initOpponentBoard() {
+  opponentBoard = Array.from({ length: OPPONENT_TOTAL_ROWS }, () =>
+    Array(OPPONENT_COLS).fill(0)
+  );
+  drawOpponentBoard(); // Draw initial empty board
 }
 
 // --- Piece Generation (7-Bag Randomizer) ---
@@ -629,7 +449,7 @@ function movePiece(dx, dy) {
     currentY += dy;
     // Reset lock delay if moving downwards wasn't the cause of the check
     if (dy === 0) {
-      resetLockDelayIfTouching();
+      resetLockDelayIfTouching(); // Reset lock delay after successful rotation
     }
     return true; // Move successful
   } else if (dy > 0) {
@@ -758,41 +578,67 @@ function lockPiece() {
   if (incomingGarbageLines > 0) {
     console.log(`Applying ${incomingGarbageLines} incoming garbage lines.`);
 
-    const holePosition = Math.floor(Math.random() * COLS);
-    const newBoard = Array.from({ length: TOTAL_ROWS }, () =>
+    // Create a new board to hold the modified state
+    const newBoard = Array.from({ length: TOTAL_ROWS }, () => 
       Array(COLS).fill(0)
     );
-
-    // Shift existing rows up in the new board
-    for (let r = 0; r < TOTAL_ROWS - incomingGarbageLines; r++) {
-      if (
-        r + incomingGarbageLines < TOTAL_ROWS &&
-        board[r + incomingGarbageLines]
-      ) {
-        newBoard[r] = board[r + incomingGarbageLines];
-      } else {
-        newBoard[r] = Array(COLS).fill(0);
+    
+    // Generate a random hole position for the garbage lines
+    const holePosition = Math.floor(Math.random() * COLS);
+    
+    // First, check if adding garbage would cause game over by pushing blocks into hidden rows
+    let wouldCauseGameOver = false;
+    for (let r = 0; r < incomingGarbageLines; r++) {
+      // Check if there are any blocks in the rows that would be pushed into hidden rows
+      if (board[r] && board[r].some(cell => cell !== 0)) {
+        wouldCauseGameOver = true;
+        break;
       }
     }
-
-    // Add new garbage lines at the bottom
+    
+    if (wouldCauseGameOver) {
+      console.log("Garbage would cause game over - applying but setting game over state");
+      gameOver = true;
+      updateStatus("Game Over!");
+      if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
+        sendMessageToServer("game_over", { score, linesCleared });
+        console.log("Sent 'game_over' message to server.");
+      }
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+    }
+    
+    // Move all existing blocks up by incomingGarbageLines rows
+    for (let r = 0; r < TOTAL_ROWS - incomingGarbageLines; r++) {
+      // newBoard[r] gets content from board[r + incomingGarbageLines]
+      if (r + incomingGarbageLines < TOTAL_ROWS) {
+        newBoard[r] = [...board[r + incomingGarbageLines]];
+      }
+    }
+    
+    // Add garbage lines at the bottom of the visible board
     for (let r = TOTAL_ROWS - incomingGarbageLines; r < TOTAL_ROWS; r++) {
       const line = Array(COLS).fill("GARBAGE");
+      // Create one hole in each garbage line at the same position
       line[holePosition] = 0;
       newBoard[r] = line;
     }
-
-    // Replace the old board
+    
+    // Replace the old board with the new one
     board = newBoard;
-
+    
     // Reset the counter and update indicator
     incomingGarbageLines = 0;
     drawPendingGarbageIndicator();
-
-    // Check for game over AFTER applying garbage (if any block is in hidden rows)
-    if (checkGameOver()) {
-      console.log("Game over checked in lockPiece");
-      return; // Stop further actions if game over
+    
+    // Draw the updated board to show garbage
+    drawBoard();
+    
+    // If garbage caused game over, return now
+    if (wouldCauseGameOver) {
+      return true; // Stop further actions if game over
     }
   }
 
@@ -805,8 +651,8 @@ function lockPiece() {
     level = Math.floor(linesCleared / 10) + 1;
     dropInterval = Math.max(100, 1000 - (level - 1) * 50);
 
-    scoreElement.textContent = `Score: ${score}`;
-    linesElement.textContent = `Lines: ${linesCleared}`;
+    updateScore(score);
+    updateLines(linesCleared);
 
     console.log(
       `Cleared ${clearedLineCount} lines! Score: ${score}, Lines: ${linesCleared}, Level: ${level}`
@@ -904,26 +750,8 @@ function holdCurrentPiece() {
 
 // --- Drawing Pending Garbage Indicator ---
 function drawPendingGarbageIndicator() {
-  const indicatorCtx = gameCanvas.getContext("2d"); // Draw on main canvas for simplicity
-  const barX = -10; // Position to the left of the board
-  const barWidth = 8;
-  const barMaxHeight = gameCanvas.height - 20; // Leave some padding
-  const barHeight = Math.min(
-    barMaxHeight,
-    incomingGarbageLines * (BLOCK_SIZE / 2)
-  ); // Scale height
-
-  // Clear previous indicator area (crude method)
-  indicatorCtx.clearRect(barX - 2, 0, barWidth + 4, gameCanvas.height);
-
-  if (incomingGarbageLines > 0) {
-    indicatorCtx.fillStyle = "red";
-    indicatorCtx.fillRect(
-      barX,
-      gameCanvas.height - barHeight,
-      barWidth,
-      barHeight
-    );
+  if (renderer) {
+    renderer.drawPendingGarbageIndicator(incomingGarbageLines);
   }
 }
 
@@ -937,152 +765,44 @@ function getGhostPieceY() {
 }
 
 // --- Drawing Functions ---
-function drawBlock(ctx, x, y, color, stroke = "black", blockSize = BLOCK_SIZE) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x * blockSize, y * blockSize, blockSize, blockSize);
-  ctx.strokeStyle = stroke;
-  ctx.strokeRect(x * blockSize, y * blockSize, blockSize, blockSize);
-}
-
 function drawBoard() {
-  // Clear only the visible area
-  gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
-
-  // Draw grid lines (optional)
-  gameCtx.strokeStyle = COLORS.GRID;
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      gameCtx.strokeRect(
-        c * BLOCK_SIZE,
-        r * BLOCK_SIZE,
-        BLOCK_SIZE,
-        BLOCK_SIZE
-      );
-    }
-  }
-
-  // Draw locked pieces (only the visible part)
-  for (let r = HIDDEN_ROWS; r < TOTAL_ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (board[r][c]) {
-        const color = COLORS[board[r][c]] || "gray"; // Use type to get color
-        // Adjust y-coordinate for drawing since board includes hidden rows
-        drawBlock(gameCtx, c, r - HIDDEN_ROWS, color);
-      }
-    }
-  }
-}
-
-function drawPiece(
-  ctx,
-  piece,
-  drawX,
-  drawY,
-  isGhost = false,
-  isPreview = false,
-  previewSize = BLOCK_SIZE
-) {
-  if (!piece) return;
-  const shape = piece.shape;
-  const color = isGhost ? COLORS.GHOST : piece.color;
-  const blockSize = isPreview ? previewSize : BLOCK_SIZE;
-  const stroke = isPreview ? "#ccc" : "black";
-
-  ctx.fillStyle = color;
-  ctx.strokeStyle = stroke;
-
-  for (let r = 0; r < shape.length; r++) {
-    for (let c = 0; c < shape[r].length; c++) {
-      if (shape[r][c]) {
-        const blockX = (drawX + c) * blockSize;
-        const blockY = (drawY + r) * blockSize;
-        ctx.fillRect(blockX, blockY, blockSize, blockSize);
-        ctx.strokeRect(blockX, blockY, blockSize, blockSize);
-      }
-    }
+  // Use the renderer to draw the board
+  if (renderer) {
+    renderer.drawBoard(board);
   }
 }
 
 function drawCurrentPiece() {
-  if (!currentPiece || gameOver || gameWon) return;
-
-  // Draw Ghost Piece first
-  const ghostY = getGhostPieceY();
-  // Adjust y-coordinate for drawing ghost piece in visible area
-  drawPiece(gameCtx, currentPiece, currentX, ghostY - HIDDEN_ROWS, true);
-
-  // Draw Actual Piece
-  // Adjust y-coordinate for drawing current piece in visible area
-  drawPiece(gameCtx, currentPiece, currentX, currentY - HIDDEN_ROWS);
+  // Use the renderer to draw the current piece
+  if (renderer && currentPiece) {
+    const ghostY = getGhostPieceY();
+    renderer.drawCurrentPiece(currentPiece, currentX, currentY, ghostY);
+  }
 }
 
 function drawHoldPiece() {
-  holdCtx.clearRect(0, 0, holdCanvas.width, holdCanvas.height);
-  if (holdPiece) {
-    const pieceData = {
-      shape: SHAPES[holdPiece],
-      color: COLORS[holdPiece],
-    };
-    const previewBlockSize = holdCanvas.width / 5; // Smaller blocks for preview
-    const shape = pieceData.shape;
-    // Calculate offset to center the piece
-    const offsetX = (holdCanvas.width / previewBlockSize - shape[0].length) / 2;
-    const offsetY = (holdCanvas.height / previewBlockSize - shape.length) / 2;
-    drawPiece(
-      holdCtx,
-      pieceData,
-      offsetX,
-      offsetY,
-      false,
-      true,
-      previewBlockSize
-    );
+  // Use the renderer to draw the hold piece
+  if (renderer) {
+    renderer.drawHoldPiece(holdPiece);
   }
 }
 
 function drawNextQueue() {
-  nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-  const previewBlockSize = nextCanvas.width / 5; // Smaller blocks for preview
-  let yOffset = 0.5; // Initial y offset
-
-  for (let i = 0; i < Math.min(nextQueue.length, NEXT_QUEUE_SIZE); i++) {
-    // Show up to NEXT_QUEUE_SIZE next pieces
-    const pieceType = nextQueue[i];
-    const pieceData = {
-      shape: SHAPES[pieceType],
-      color: COLORS[pieceType],
-    };
-    const shape = pieceData.shape;
-    const offsetX = (nextCanvas.width / previewBlockSize - shape[0].length) / 2;
-
-    drawPiece(
-      nextCtx,
-      pieceData,
-      offsetX,
-      yOffset,
-      false,
-      true,
-      previewBlockSize
-    );
-
-    // Adjust yOffset for the next piece based on the current piece's height
-    const pieceHeight =
-      shape.length -
-      shape.reduceRight(
-        (emptyRows, row) => (row.every((cell) => !cell) ? emptyRows + 1 : 0),
-        0
-      );
-    yOffset += pieceHeight + 0.5; // Add some padding
+  // Use the renderer to draw the next queue
+  if (renderer) {
+    renderer.drawNextQueue(nextQueue, NEXT_QUEUE_SIZE);
   }
 }
 
-// --- Opponent Board --- TODO: Refactor drawing logic?
-function initOpponentBoard() {
-  opponentBoard = Array.from({ length: OPPONENT_TOTAL_ROWS }, () =>
-    Array(OPPONENT_COLS).fill(0)
-  );
-  drawOpponentBoard(); // Draw initial empty board
+function drawOpponentBoard() {
+  // Use the renderer to draw the opponent board
+  if (renderer) {
+    renderer.drawOpponentBoard(opponentBoard);
+  }
 }
+
+// --- Opponent Board Management ---
+// Note: The duplicate initOpponentBoard function was removed here
 
 function updateOpponentBoard(newBoardState) {
   // Directly replace the opponent's board state
@@ -1097,81 +817,60 @@ function updateOpponentBoard(newBoardState) {
   }
 }
 
-function drawOpponentBoard() {
-  const opponentCtx = opponentCanvas.getContext("2d");
-  opponentCtx.clearRect(0, 0, opponentCanvas.width, opponentCanvas.height);
-
-  // Draw grid lines (optional, lighter)
-  opponentCtx.strokeStyle = "#eee";
-  for (let r = 0; r < OPPONENT_ROWS; r++) {
-    for (let c = 0; c < OPPONENT_COLS; c++) {
-      opponentCtx.strokeRect(
-        c * OPPONENT_BLOCK_SIZE,
-        r * OPPONENT_BLOCK_SIZE,
-        OPPONENT_BLOCK_SIZE,
-        OPPONENT_BLOCK_SIZE
-      );
-    }
-  }
-
-  // Draw locked pieces (visible part)
-  for (let r = OPPONENT_HIDDEN_ROWS; r < OPPONENT_TOTAL_ROWS; r++) {
-    for (let c = 0; c < OPPONENT_COLS; c++) {
-      if (opponentBoard[r] && opponentBoard[r][c]) {
-        const color = COLORS[opponentBoard[r][c]] || "gray";
-        drawBlock(
-          opponentCtx,
-          c,
-          r - OPPONENT_HIDDEN_ROWS,
-          color,
-          "#ccc",
-          OPPONENT_BLOCK_SIZE
-        );
-      }
-    }
-  }
-}
-
 // --- UI Updates ---
 function updateStatus(text) {
-  // Simple status update - replace h1 or add a dedicated status element
+  // Simple status update
   statusElement.textContent = text;
+}
+
+function updateScore(score) {
+  // Update score display
+  scoreElement.textContent = `Score: ${score}`;
+}
+
+function updateLines(lines) {
+  // Update lines cleared display
+  linesElement.textContent = `Lines: ${lines}`;
 }
 
 // --- Game Loop ---
 function gameLoop(timestamp = 0) {
-  // Stop loop if game over, paused, or won
-  if (gameOver || gamePaused || gameWon) {
-    // We might have already cancelled, but belt-and-suspenders
-    if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    animationFrameId = null;
-    return;
-  }
-
-  // Don't run game logic if not started (waiting for opponent)
-  if (!gameStarted) {
-    requestAnimationFrame(gameLoop);
-    return;
+  if (gameOver || gamePaused || gameWon || !gameStarted) {
+    return; // Skip loop if game is not active
   }
 
   const deltaTime = timestamp - lastTime;
-  lastTime = timestamp;
-  accumulatedTime += deltaTime;
 
-  // Update game state (automatic downward movement)
-  if (accumulatedTime >= dropInterval) {
-    movePiece(0, 1);
-    accumulatedTime = 0; // Reset accumulator
+  if (deltaTime >= dropInterval) {
+    // Time to drop the piece
+    if (!movePiece(0, 1)) {
+      // If can't move down, start lock delay or lock immediately
+      if (isTouchingGround()) {
+        if (!lockDelayTimer) {
+          startLockDelay();
+        }
+      }
+    }
+    lastTime = timestamp;
   }
 
   // Draw everything
-  drawBoard(); // Draw the board first
-  drawCurrentPiece(); // Draw the current piece (and ghost) on top
-  drawPendingGarbageIndicator(); // Draw garbage indicator on top
-  // Side panels are drawn on demand (spawn, hold, next queue update)
-  // drawHoldPiece();
-  // drawNextQueue();
+  if (renderer) {
+    renderer.drawBoard(board);
+    
+    // Only draw current piece if game is active
+    if (currentPiece && !gameOver && !gameWon) {
+      const ghostY = getGhostPieceY();
+      renderer.drawCurrentPiece(currentPiece, currentX, currentY, ghostY);
+    }
+    
+    // Draw garbage indicator if needed
+    if (incomingGarbageLines > 0) {
+      renderer.drawPendingGarbageIndicator(incomingGarbageLines);
+    }
+  }
 
+  // Request next frame
   animationFrameId = requestAnimationFrame(gameLoop);
 }
 
@@ -1182,33 +881,56 @@ const keyMap = {
   ArrowDown: softDrop,
   ArrowUp: rotatePiece, // Rotate
   " ": hardDrop, // Space bar
-  KeyC: holdCurrentPiece,
+  c: holdCurrentPiece, // Change from KeyC to c
+  C: holdCurrentPiece, // Also add uppercase C for caps lock
+  KeyC: holdCurrentPiece, // Keep original for compatibility
   KeyP: () => {
     // Pause Toggle
-    // Disable pause in multiplayer for now?
-    // gamePaused = !gamePaused;
-    // console.log(gamePaused ? "Game Paused" : "Game Resumed");
-    // if (!gamePaused) {
-    //     lastTime = performance.now(); // Reset timer on unpause
-    //     gameLoop(); // Restart loop if paused
-    // } else {
-    //     // Optional: Draw a pause overlay
-    //     gameCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    //     gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
-    //     gameCtx.font = '30px Arial';
-    //     gameCtx.fillStyle = 'white';
-    //     gameCtx.textAlign = 'center';
-    //     gameCtx.fillText('Paused', gameCanvas.width / 2, gameCanvas.height / 2);
-    // }
-    console.log("Pause (P) disabled in multiplayer mode.");
+    gamePaused = !gamePaused;
+    console.log(gamePaused ? "Game Paused" : "Game Resumed");
+    if (!gamePaused) {
+      lastTime = performance.now(); // Reset timer on unpause
+      gameLoop(); // Restart loop if paused
+    } else {
+      // Optional: Draw a pause overlay
+      gameCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      gameCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+      gameCtx.font = '30px Arial';
+      gameCtx.fillStyle = 'white';
+      gameCtx.textAlign = 'center';
+      gameCtx.fillText('Paused', gameCanvas.width / 2, gameCanvas.height / 2);
+    }
   },
   KeyR: () => {
     // Reset Game (Disable in multiplayer?)
-    // resetGame();
-    console.log("Reset (R) disabled in multiplayer mode.");
+    resetGame();
   },
 };
 
+document.addEventListener("keydown", (event) => {
+  // Ignore input if game not active
+  if (gameOver || gamePaused || gameWon || !gameStarted) return;
+
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    if (!moveKeyDown) {
+      // Only start movement if not already moving
+      startMovement(event.key);
+    }
+  } else if (keyMap[event.code] || keyMap[event.key]) {
+    event.preventDefault(); // Prevent default browser actions (like space scrolling)
+    // Try both event.code (for KeyC) and event.key (for "c" or "C")
+    const handler = keyMap[event.code] || keyMap[event.key];
+    if (handler) handler();
+  }
+});
+
+document.addEventListener("keyup", (event) => {
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    if (moveKeyDown === event.key) {
+      stopMovement();
+    }
+  }
+});
 // Auto-repeat for left/right movement
 let moveInterval = null;
 let repeatDelay = 150; // ms delay before repeat starts
@@ -1242,29 +964,6 @@ function startMovement(key) {
   }, repeatDelay);
 }
 
-document.addEventListener("keydown", (event) => {
-  // Ignore input if game not active
-  if (gameOver || gamePaused || gameWon || !gameStarted) return;
-
-  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-    if (!moveKeyDown) {
-      // Only start movement if not already moving
-      startMovement(event.key);
-    }
-  } else if (keyMap[event.key]) {
-    event.preventDefault(); // Prevent default browser actions (like space scrolling)
-    keyMap[event.key]();
-  }
-});
-
-document.addEventListener("keyup", (event) => {
-  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-    if (moveKeyDown === event.key) {
-      stopMovement();
-    }
-  }
-});
-
 // --- Start Screen Flow ---
 function showStartScreen() {
   startScreenElement.style.display = "flex"; // Use flex as set in CSS
@@ -1276,6 +975,17 @@ function showStartScreen() {
 
 function hideStartScreen() {
   startScreenElement.style.display = "none";
+}
+
+function showGameArea() {
+  // Hide start screen and show game area
+  hideStartScreen();
+  gameAreaElement.style.display = "flex";
+  
+  // Initialize renderer if not already created
+  if (!renderer) {
+    renderer = new GameRenderer(gameCanvas, holdCanvas, nextCanvas, opponentCanvas);
+  }
 }
 
 // Disable buttons/input during connection/matchmaking attempts
@@ -1300,25 +1010,24 @@ function displayRoomCode(code) {
   privateRoomInfo.style.display = "block";
 }
 
-function showGameArea() {
-  hideStartScreen(); // Ensure start screen is hidden
-  gameAreaElement.style.display = "flex";
-}
-
 // --- New Button Handlers ---
 function handlePlayPublic() {
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    connectWebSocket(); // Connect first if needed
-    // Wait for ws.onopen to enable buttons, then user clicks again
-    // Or, queue the action: ws.onopen = () => { ...; sendMessage({ type: 'find_public_match' }); };
-    // For simplicity now, just connect and let user click again.
-    updateStatus("Connecting... Click Play Public again once connected.");
-    return;
-  }
-  console.log("Requesting public match...");
-  sendMessageToServer("find_public_match");
-  updateStatus("Finding public match...");
-  disableStartScreen(); // Disable buttons while waiting
+  updateStatus("Connecting to server...");
+  disableStartScreen();
+  
+  // Connect to server and request public match
+  connectWebSocket();
+  
+  // Wait for connection to establish before sending match request
+  setTimeout(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      sendMessageToServer("find_public_match");
+      updateStatus("Finding opponent...");
+    } else {
+      updateStatus("Connection failed. Try again.");
+      enableStartScreen();
+    }
+  }, 500);
 }
 
 function handleCreatePrivate() {
@@ -1356,7 +1065,6 @@ function handleJoinPrivate() {
 // Initial setup when the script loads
 document.addEventListener("DOMContentLoaded", () => {
   console.log("DOM Loaded. Setting up start screen.");
-  initDrawingContexts(); // Set up canvases
   showStartScreen();
   // New button listeners
   playPublicButton.addEventListener("click", handlePlayPublic);
@@ -1386,4 +1094,19 @@ function checkGameOver() {
     return true; // Indicate game is over
   }
   return false; // Indicate game is not over
+}
+
+// Reset the game for a new match
+function resetGame() {
+  initGameState();
+  lastTime = 0; // Reset animation timer
+  accumulatedTime = 0;
+  console.log("Game Reset and Started");
+  gameLoop(); // Start the game loop
+}
+
+// Start the game
+function startGame() {
+  // Just call resetGame to start the game with a clean state
+  resetGame();
 }
