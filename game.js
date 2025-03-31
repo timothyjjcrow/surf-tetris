@@ -308,7 +308,7 @@ function handleServerMessage(message) {
       console.log("Opponent lost! You win!");
       gameWon = true; // Set the win flag
       updateStatus("YOU WIN!");
-      showReturnToMenuButton(); // Add return to menu button on win
+      insertReturnToMenuButton();
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
         animationFrameId = null;
@@ -1337,120 +1337,96 @@ function checkGameOver() {
   return false; // Indicate game is not over
 }
 
-// Function to create and show the Return to Menu button
+// Direct DOM insertion of Return to Menu button - more reliable approach
+function insertReturnToMenuButton() {
+  console.log("FORCEFULLY inserting Return to Menu button");
+  
+  // Remove any existing button first
+  const existingButton = document.getElementById('returnToMenuBtn');
+  if (existingButton) {
+    existingButton.remove();
+  }
+  
+  // Create button with inline styles for maximum reliability
+  const menuBtn = document.createElement('button');
+  menuBtn.id = 'returnToMenuBtn';
+  menuBtn.innerText = 'Return to Menu';
+  
+  // Apply styles directly to the element
+  Object.assign(menuBtn.style, {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    padding: '15px 30px',
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    fontSize: '18px',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    zIndex: '9999',
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
+  });
+  
+  // Mobile-specific styles
+  if (window.innerWidth <= 767) {
+    Object.assign(menuBtn.style, {
+      padding: '20px 40px',
+      fontSize: '22px'
+    });
+  }
+  
+  // Add event listener
+  menuBtn.addEventListener('click', function() {
+    window.location.href = '/';
+  });
+  
+  // Add to document body directly (most reliable)
+  document.body.appendChild(menuBtn);
+  
+  console.log("Return to Menu button inserted into DOM");
+}
+
+// Call the original function as a fallback
 function showReturnToMenuButton() {
   // Check if button already exists
   if (document.getElementById('returnToMenuBtn')) return;
   
-  console.log("Creating Return to Menu button");
-  
-  const menuBtn = document.createElement('button');
-  menuBtn.id = 'returnToMenuBtn';
-  menuBtn.innerText = 'Return to Menu';
-  menuBtn.classList.add('return-to-menu-btn');
-  
-  // Add event listener to return to menu
-  menuBtn.addEventListener('click', function() {
-    window.location.href = '/'; // Return to index.html
-  });
-  
-  // Add touch event listeners for mobile
-  menuBtn.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    window.location.href = '/';
-  });
-  
-  // Find the appropriate container - try both main game container and board containers
-  let gameContainer = document.querySelector('.game-container');
-  
-  // If game container not found, try parent of canvas
-  if (!gameContainer && mainCanvas) {
-    gameContainer = mainCanvas.parentElement;
-  }
-  
-  // If still not found, use the document body as fallback
-  if (!gameContainer) {
-    console.warn("Game container not found, appending to body");
-    gameContainer = document.body;
-  }
-  
-  // Add the button to the container
-  gameContainer.appendChild(menuBtn);
-  
-  // Make the button more visible
-  menuBtn.style.zIndex = "9999"; 
-  
-  // Add the style for the button if not already in the document
-  if (!document.getElementById('returnBtnStyle')) {
-    const style = document.createElement('style');
-    style.id = 'returnBtnStyle';
-    style.innerHTML = `
-      .return-to-menu-btn {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        padding: 15px 30px;
-        background-color: #4CAF50;
-        color: white;
-        font-size: 18px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        z-index: 1000;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-      }
-      
-      .return-to-menu-btn:hover {
-        background-color: #3e8e41;
-      }
-      
-      /* Mobile-specific styling */
-      @media screen and (max-width: 767px) {
-        .return-to-menu-btn {
-          padding: 20px 40px;
-          font-size: 22px;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-  
-  // Force a reflow to ensure the button appears
-  menuBtn.offsetHeight;
+  console.log("Creating Return to Menu button (original method)");
+  insertReturnToMenuButton();
 }
 
-// Reset the game for a new match
-function resetGame() {
-  initGameState();
-  initOpponentBoard();
-  gameWon = false;
-  gameOver = false;
-  
-  // Initialize or show mobile controls immediately
-  if (!mobileControls) {
-    mobileControls = new MobileControlsHandler(gameActions);
-  } else {
-    mobileControls.show();
+// Function to send score updates to the server
+function sendScoreUpdate() {
+  if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
+    sendMessageToServer("update_score", {
+      score: score,
+      lines: linesCleared
+    });
   }
-  
-  startGame();
 }
 
-// Start the game
-function startGame() {
-  gameStarted = true;
-  gameLoop();
+// Send periodic score updates (every 10 seconds)
+function startPeriodicScoreUpdates() {
+  if (scoreUpdateInterval) clearInterval(scoreUpdateInterval);
+  
+  scoreUpdateInterval = setInterval(() => {
+    if (gameStarted && !gameOver && !gameWon) {
+      sendScoreUpdate();
+    } else {
+      clearInterval(scoreUpdateInterval);
+      scoreUpdateInterval = null;
+    }
+  }, 10000); // Send score update every 10 seconds
 }
 
-// Add a function to cancel match search
-function cancelMatchSearch() {
-  if (searchingForMatch && ws && ws.readyState === WebSocket.OPEN) {
-    sendMessageToServer("cancel_search");
-    updateStatus("Match search canceled");
-  }
-  searchingForMatch = false;
-  enableStartScreen();
+// Initialize score update interval
+let scoreUpdateInterval = null;
+
+function getLinePoints(lines) {
+  const points = [0, 100, 300, 500, 800];
+  return points[lines];
 }
 
 // Activate speed-up attack
@@ -1585,34 +1561,35 @@ function scrambleCurrentBoard(intensity) {
   }, 5000);
 }
 
-// Function to send score updates to the server
-function sendScoreUpdate() {
-  if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
-    sendMessageToServer("update_score", {
-      score: score,
-      lines: linesCleared
-    });
-  }
-}
-
-// Send periodic score updates (every 10 seconds)
-function startPeriodicScoreUpdates() {
-  if (scoreUpdateInterval) clearInterval(scoreUpdateInterval);
+// Reset the game for a new match
+function resetGame() {
+  initGameState();
+  initOpponentBoard();
+  gameWon = false;
+  gameOver = false;
   
-  scoreUpdateInterval = setInterval(() => {
-    if (gameStarted && !gameOver && !gameWon) {
-      sendScoreUpdate();
-    } else {
-      clearInterval(scoreUpdateInterval);
-      scoreUpdateInterval = null;
-    }
-  }, 10000); // Send score update every 10 seconds
+  // Initialize or show mobile controls immediately
+  if (!mobileControls) {
+    mobileControls = new MobileControlsHandler(gameActions);
+  } else {
+    mobileControls.show();
+  }
+  
+  startGame();
 }
 
-// Initialize score update interval
-let scoreUpdateInterval = null;
+// Start the game
+function startGame() {
+  gameStarted = true;
+  gameLoop();
+}
 
-function getLinePoints(lines) {
-  const points = [0, 100, 300, 500, 800];
-  return points[lines];
+// Add a function to cancel match search
+function cancelMatchSearch() {
+  if (searchingForMatch && ws && ws.readyState === WebSocket.OPEN) {
+    sendMessageToServer("cancel_search");
+    updateStatus("Match search canceled");
+  }
+  searchingForMatch = false;
+  enableStartScreen();
 }

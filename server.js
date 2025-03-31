@@ -251,9 +251,15 @@ wss.on('connection', (ws) => {
                             // Record match result in database if both players are authenticated
                             if (ws.userId && opponent && opponent.userId) {
                                 try {
-                                    const gameStatsModel = require('./models/gameStatsModel');
+                                    console.log(`Recording match result: Player ${ws.userId} vs Player ${opponent.userId}`);
+                                    console.log(`Player ${ws.userId} lost: ${ws.lost}, Player ${opponent.userId} lost: ${opponent.lost}`);
+                                    
+                                    // Determine winner and loser IDs
                                     const winnerId = ws.lost ? opponent.userId : ws.userId;
                                     const loserId = ws.lost ? ws.userId : opponent.userId;
+                                    
+                                    console.log(`Winner: ${winnerId}, Loser: ${loserId}`);
+                                    console.log(`Player 1 score: ${ws.lastScore || 0}, Player 2 score: ${opponent.lastScore || 0}`);
                                     
                                     // Match data includes scores and lines cleared
                                     const matchData = {
@@ -263,15 +269,46 @@ wss.on('connection', (ws) => {
                                         loserLines: ws.lost ? (ws.lastLines || 0) : (opponent.lastLines || 0)
                                     };
                                     
+                                    // For debugging
+                                    console.log('Match data:', matchData);
+                                    
+                                    // Import the gameStatsModel directly
+                                    const gameStatsModel = require('./models/gameStatsModel');
+                                    
                                     // Record match result
                                     gameStatsModel.recordMatchResult(ws.userId, opponent.userId, winnerId, matchData)
-                                        .then(() => console.log(`Match result recorded: ${winnerId} won against ${loserId}`))
-                                        .catch(err => console.error('Error recording match result:', err));
+                                        .then(() => {
+                                            console.log(`Match result recorded: ${winnerId} won against ${loserId}`);
+                                            
+                                            // Send update notification to both players
+                                            const updateMsg = {
+                                                type: 'stats_updated',
+                                                payload: { message: 'Your stats have been updated!' }
+                                            };
+                                            
+                                            if (ws.readyState === WebSocket.OPEN) {
+                                                sendMessage(ws, updateMsg);
+                                            }
+                                            
+                                            if (opponent.readyState === WebSocket.OPEN) {
+                                                sendMessage(opponent, updateMsg);
+                                            }
+                                        })
+                                        .catch(err => {
+                                            console.error('Error recording match result:', err);
+                                            console.error('Error details:', err.stack);
+                                        });
                                 } catch (err) {
                                     console.error('Error processing match result:', err);
+                                    console.error('Error stack:', err.stack);
                                 }
+                            } else {
+                                console.log('Cannot record match result - missing user IDs:');
+                                console.log(`Player 1 ID: ${ws.userId || 'not set'}`);
+                                console.log(`Player 2 ID: ${opponent ? opponent.userId || 'not set' : 'opponent disconnected'}`);
                             }
                             
+                            // Delete the game room when finished
                             gameRooms.delete(ws.roomId);
                         }
                         break;
