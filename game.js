@@ -200,17 +200,26 @@ function connectWebSocket() {
     // Use wss:// and the same hostname, no port needed for standard HTTPS/WSS port 443
     wsUrl = `wss://${window.location.host}`;
   } else {
-    // Use ws:// and add the port for local development (e.g., localhost:8080)
-    // Assumes server runs on port 8080 locally
-    wsUrl = `ws://${window.location.hostname}:8080`;
+    // Use ws:// for http:// pages
+    wsUrl = SERVER_URL;
   }
-
-  console.log(`Attempting to connect WebSocket to: ${wsUrl}`);
-
+  
+  console.log(`Connecting to WebSocket at ${wsUrl}`);
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
-    console.log("WebSocket connection established");
+    console.log("WebSocket connected!");
+    // Try to get user info from localStorage
+    const token = localStorage.getItem('tetris_token');
+    const userId = localStorage.getItem('tetris_user_id');
+    
+    // Send authentication if we have the user data
+    if (token && userId) {
+      console.log(`Authenticating with user ID: ${userId}`);
+      sendMessageToServer('user_auth', { userId, token });
+    } else {
+      console.log('No authentication data found in localStorage');
+    }
     updateStatus("Connected to server. Choose match type.");
     // Reset game state variables needed for start screen logic
     gameStarted = false;
@@ -219,23 +228,6 @@ function connectWebSocket() {
     opponentLost = false;
     // Make sure start screen is enabled on fresh connection
     enableStartScreen();
-    
-    // Send user ID to server if logged in
-    const userId = localStorage.getItem('tetris_user_id');
-    if (userId) {
-      console.log("Sending user authentication to server, ID:", userId);
-      sendMessageToServer("user_auth", { userId: userId });
-      
-      // Retry authentication after 2 seconds just to be safe
-      setTimeout(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          console.log("Resending user authentication (retry)");
-          sendMessageToServer("user_auth", { userId: userId });
-        }
-      }, 2000);
-    } else {
-      console.log("No user ID found in localStorage - user not logged in");
-    }
   };
 
   ws.onmessage = (event) => {
@@ -426,9 +418,18 @@ function handleServerMessage(message) {
       // Show a victory notification
       showNotification("You won the game!", "speedup-sent");
       
-      // Keep the game loop running so the player can see their final board
-      break;
+      // Show return to menu button for winner
+      insertReturnToMenuButton();
+      setTimeout(insertReturnToMenuButton, 500); // Retry after a short delay for reliability
+      setTimeout(forceButtonCreation, 1000); // Use fallback method as well
       
+      // Stop the game loop
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+      break;
+
     case "game_lost":
       // Handler for when we're told we lost
       console.log("Game lost confirmed by server");
@@ -1346,35 +1347,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // --- Game Over Check ---
 function checkGameOver() {
-  // Returns true if game is over, false otherwise
-  // Check if the *current* piece (or potential spawn) overlaps
-  if (checkCollision(currentX, currentY, currentPiece.shape)) {
-    gameOver = true;
-    if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
-      // Only send if connected and game has started
-      const userId = localStorage.getItem('tetris_user_id');
-      const payload = { 
-        score: score, 
-        linesCleared: linesCleared
-      };
-      
-      if (userId) {
-        payload.userId = userId;
-        console.log("Sending game_over with user ID:", userId);
+  // Check if any part of the spawn location already has blocks
+  if (currentPiece) {
+    const shape = currentPiece.shape;
+    for (let r = 0; r < shape.length; r++) {
+      for (let c = 0; c < shape[r].length; c++) {
+        if (shape[r][c]) {
+          const boardRow = currentY + r;
+          const boardCol = currentX + c;
+          // If a block is in the hidden rows, we'll assume it's a valid move
+          // But if the board already has a block there in the visible area, it's game over
+          if (
+            boardRow >= 0 && // Only checking visible rows
+            boardRow < TOTAL_ROWS &&
+            boardCol >= 0 &&
+            boardCol < COLS &&
+            board[boardRow][boardCol] !== 0
+          ) {
+            console.log("Game over condition detected!");
+            gameOver = true;
+            updateStatus("Game Over!");
+            
+            // Make sure to send a final score update before the game over message
+            sendScoreUpdate();
+            
+            if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
+              sendMessageToServer("game_over", { score, linesCleared });
+              console.log("Sent game_over message to server with score:", score, "lines:", linesCleared);
+            }
+            
+            playerLost = true;
+            showReturnToMenuButton();
+            if (animationFrameId) {
+              cancelAnimationFrame(animationFrameId);
+              animationFrameId = null;
+            }
+            return true;
+          }
+        }
       }
-      
-      sendMessageToServer("game_over", payload);
-      console.log("Sent 'game_over' message to server with payload:", payload);
     }
-    updateStatus("Game Over!");
-    showReturnToMenuButton();
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
-    }
-    return true; // Indicate game is over
   }
-  return false; // Indicate game is not over
+  return false;
 }
 
 // Direct DOM insertion of Return to Menu button - more reliable approach
