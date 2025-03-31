@@ -219,6 +219,13 @@ function connectWebSocket() {
     opponentLost = false;
     // Make sure start screen is enabled on fresh connection
     enableStartScreen();
+    
+    // Send user ID to server if logged in
+    const userId = localStorage.getItem('tetris_user_id');
+    if (userId) {
+      sendMessageToServer("user_auth", { userId: userId });
+      console.log("Sent user authentication to server");
+    }
   };
 
   ws.onmessage = (event) => {

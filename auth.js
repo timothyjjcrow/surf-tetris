@@ -1,4 +1,51 @@
 // auth.js - Handle user authentication in the frontend
+
+// Logout function (global scope so it can be called from onclick)
+function logout() {
+    localStorage.removeItem('tetris_token');
+    localStorage.removeItem('tetris_user_id');
+    
+    // Update UI
+    updateAuthUI(false);
+    
+    // Redirect to login if desired
+    // window.location.href = '/login.html';
+}
+
+// Update auth UI based on login status
+function updateAuthUI(isLoggedIn, username = '') {
+    // Handle the user display in the header
+    const userDisplayElement = document.getElementById('user-display');
+    if (userDisplayElement) {
+        if (isLoggedIn && username) {
+            userDisplayElement.textContent = `Logged in as: ${username}`;
+            userDisplayElement.style.display = 'block';
+        } else {
+            userDisplayElement.style.display = 'none';
+        }
+    }
+    
+    // Handle the login/logout buttons in nav
+    const loginRegisterBtn = document.getElementById('login-register-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    
+    if (loginRegisterBtn && logoutBtn) {
+        if (isLoggedIn) {
+            loginRegisterBtn.style.display = 'none';
+            logoutBtn.style.display = 'inline-block';
+        } else {
+            loginRegisterBtn.style.display = 'inline-block';
+            logoutBtn.style.display = 'none';
+        }
+    }
+    
+    // Handle login prompt
+    const loginPrompt = document.getElementById('login-prompt');
+    if (loginPrompt) {
+        loginPrompt.style.display = isLoggedIn ? 'none' : 'block';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Elements
     const loginForm = document.getElementById('login-form');
@@ -55,6 +102,9 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('tetris_token', data.token);
             localStorage.setItem('tetris_user_id', data.userId);
             localStorage.setItem('tetris_username', data.username);
+            
+            // Update UI to show logged in state
+            updateAuthUI(true, data.username);
             
             // Redirect to game
             window.location.href = 'index.html';
@@ -115,11 +165,59 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Check if user is already logged in
-    const checkAuthStatus = () => {
+    const checkAuthStatus = async () => {
         const token = localStorage.getItem('tetris_token');
-        if (token && window.location.pathname.includes('login.html')) {
-            // If we're on the login page but already logged in, redirect to game
-            window.location.href = 'index.html';
+        if (token) {
+            try {
+                // Fetch user data from API
+                const response = await fetch('/api/auth/profile', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    // Store user ID in local storage
+                    localStorage.setItem('tetris_user_id', userData.id);
+                    
+                    // Update UI to show logged in state
+                    updateAuthUI(true, userData.username);
+                    
+                    // If we're on the login page but already logged in, redirect to game
+                    if (window.location.pathname.includes('login.html')) {
+                        window.location.href = 'index.html';
+                    }
+                } else {
+                    // Token is invalid, remove it
+                    localStorage.removeItem('tetris_token');
+                    localStorage.removeItem('tetris_user_id');
+                    
+                    // Update UI to show logged out state
+                    updateAuthUI(false);
+                    
+                    // If not on login page, redirect to login
+                    if (!window.location.pathname.includes('login.html')) {
+                        // Uncomment if you want to force login
+                        // window.location.href = '/login.html';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking auth status:', error);
+                updateAuthUI(false);
+            }
+        } else {
+            // Not logged in
+            updateAuthUI(false);
+            
+            if (!window.location.pathname.includes('login.html')) {
+                // Show login prompt if not on login page
+                const loginPrompt = document.getElementById('login-prompt');
+                if (loginPrompt) {
+                    loginPrompt.style.display = 'block';
+                }
+            }
         }
     };
     

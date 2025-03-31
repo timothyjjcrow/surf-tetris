@@ -143,12 +143,25 @@
 </head>
 <body>
     <h1>Multiplayer Tetris</h1>
+    
+    <!-- User authentication display -->
+    <div class="user-auth-container" style="text-align: center; margin: 0 auto 15px auto;">
+        <div id="user-display" style="display: none; font-weight: bold; color: #4CAF50;"></div>
+        <div id="login-prompt" style="display: none;">
+            <a href="login.html" style="background-color: #4CAF50; color: white; padding: 5px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">Login to Track Stats</a>
+        </div>
+    </div>
+
     <div id="status">Loading...</div> <!-- Status Indicator -->
 
     <div id="startScreen" style="text-align: center; margin-top: 50px;">
         <!-- Navigation links to new features -->
         <div class="nav-links" style="display: flex; justify-content: center; margin-bottom: 20px;">
-            <a href="login.html" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 10px;">Login/Register</a>
+            <!-- Auth buttons will be controlled by auth.js -->
+            <div id="auth-buttons">
+                <a href="login.html" id="login-register-btn" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 10px;">Login/Register</a>
+                <button id="logout-btn" onclick="logout()" style="background-color: #f44336; color: white; padding: 10px 20px; border: none; border-radius: 5px; margin: 0 10px; cursor: pointer; display: none;">Logout</button>
+            </div>
             <a href="leaderboard.html" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 10px;">Leaderboard</a>
         </div>
         
@@ -229,6 +242,7 @@
         </div>
     </div>
 
-    <script src="game.js" type="module"></script>
+    <script src="game.js"></script>
+    <script src="auth.js"></script>
 </body>
 </html>

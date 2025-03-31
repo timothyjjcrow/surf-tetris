@@ -345,6 +345,13 @@ wss.on('connection', (ws) => {
                     ws.lastLines = data.payload.lines;
                     break;
 
+                case 'user_auth':
+                    if (data.payload && data.payload.userId) {
+                        ws.userId = data.payload.userId;
+                        console.log(`User authenticated: ${ws.userId}`);
+                    }
+                    break;
+
                 default:
                     // If the message type is unknown or requires a room but the client isn't in one
                     logAndIgnore(ws, data.type, true);
