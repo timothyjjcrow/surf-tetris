@@ -113,6 +113,7 @@ let playerLost = false;
 let playerWon = false; 
 let roomId = null; 
 let level = 1; // Added missing level variable with initial value
+let searchingForMatch = false; // Track if we're currently searching for a match
 
 // Animation and timing state
 let lastTime = 0;
@@ -206,6 +207,8 @@ function handleServerMessage(message) {
         playerNumber = message.payload.playerNumber;
         roomId = message.payload.roomId;
         updateStatus(`Opponent found! Player ${playerNumber}. Starting...`);
+        // Reset search state when match is found
+        searchingForMatch = false;
         // TODO: Implement countdown?
         showGameArea(); // Show the main game UI
         initOpponentBoard(); // Initialize opponent display
@@ -1011,7 +1014,12 @@ function showGameArea() {
 }
 
 // Disable buttons/input during connection/matchmaking attempts
-function disableStartScreen() {
+function disableStartScreen(reason = "") {
+  if (reason) {
+    updateStatus(reason);
+  }
+  
+  // Don't hide the screen, just disable the buttons
   playPublicButton.disabled = true;
   createPrivateButton.disabled = true;
   joinPrivateButton.disabled = true;
@@ -1024,6 +1032,7 @@ function enableStartScreen() {
   createPrivateButton.disabled = false;
   joinPrivateButton.disabled = false;
   roomCodeInput.disabled = false;
+  searchingForMatch = false; // Reset search state when enabling start screen
 }
 
 // Display the generated room code
@@ -1034,6 +1043,13 @@ function displayRoomCode(code) {
 
 // --- New Button Handlers ---
 function handlePlayPublic() {
+  // Prevent multiple requests if already searching
+  if (searchingForMatch) {
+    console.log("Already searching for a match");
+    return;
+  }
+  
+  searchingForMatch = true;
   updateStatus("Connecting to server...");
   disableStartScreen();
   
@@ -1047,6 +1063,7 @@ function handlePlayPublic() {
       updateStatus("Finding opponent...");
     } else {
       updateStatus("Connection failed. Try again.");
+      searchingForMatch = false; // Reset search state
       enableStartScreen();
     }
   }, 500);
@@ -1139,4 +1156,14 @@ function resetGame() {
 function startGame() {
   gameStarted = true;
   gameLoop();
+}
+
+// Add a function to cancel match search
+function cancelMatchSearch() {
+  if (searchingForMatch && ws && ws.readyState === WebSocket.OPEN) {
+    sendMessageToServer("cancel_search");
+    updateStatus("Match search canceled");
+  }
+  searchingForMatch = false;
+  enableStartScreen();
 }
