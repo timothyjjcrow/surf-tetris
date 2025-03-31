@@ -852,6 +852,9 @@ function lockPiece() {
     board: board, // Send the entire board state for now (simplest)
     // TODO: Send less data (piece type, rotation, x, y) later for efficiency
   });
+  
+  // Send updated score to server
+  sendScoreUpdate();
 }
 
 function isTouchingGround() {
@@ -1460,7 +1463,7 @@ function activateScramble(intensity) {
     // Optionally restore original board state
     // board = originalBoardState;
     // drawBoard();
-  }, 5000); // Reset flag after 5 seconds
+  }, 5000);
 }
 
 // Scramble the current board
@@ -1539,3 +1542,30 @@ function scrambleCurrentBoard(intensity) {
     gameCanvas.style.border = boardBackup;
   }, 5000);
 }
+
+// Function to send score updates to the server
+function sendScoreUpdate() {
+  if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
+    sendMessageToServer("update_score", {
+      score: score,
+      lines: linesCleared
+    });
+  }
+}
+
+// Send periodic score updates (every 10 seconds)
+function startPeriodicScoreUpdates() {
+  if (scoreUpdateInterval) clearInterval(scoreUpdateInterval);
+  
+  scoreUpdateInterval = setInterval(() => {
+    if (gameStarted && !gameOver && !gameWon) {
+      sendScoreUpdate();
+    } else {
+      clearInterval(scoreUpdateInterval);
+      scoreUpdateInterval = null;
+    }
+  }, 10000); // Send score update every 10 seconds
+}
+
+// Initialize score update interval
+let scoreUpdateInterval = null;

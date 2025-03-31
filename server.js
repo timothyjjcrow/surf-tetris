@@ -66,6 +66,8 @@ wss.on('connection', (ws) => {
     ws.playerNumber = null; // Assign null initially
     ws.lost = false; // Assign lost status initially
     ws.userId = null; // Add userId for authenticated users
+    ws.lastScore = null; // Add lastScore for match result recording
+    ws.lastLines = null; // Add lastLines for match result recording
 
     // Send initial status or welcome message if desired
     sendMessage(ws, { type: 'status', payload: { message: 'Connected to server. Choose match type.' } });
@@ -245,6 +247,31 @@ wss.on('connection', (ws) => {
                         const allDone = (ws.lost && (opponent ? opponent.lost : true));
                         if (allDone) {
                             console.log(`Room ${ws.roomId}: Both players done, removing room.`);
+                            
+                            // Record match result in database if both players are authenticated
+                            if (ws.userId && opponent && opponent.userId) {
+                                try {
+                                    const gameStatsModel = require('./models/gameStatsModel');
+                                    const winnerId = ws.lost ? opponent.userId : ws.userId;
+                                    const loserId = ws.lost ? ws.userId : opponent.userId;
+                                    
+                                    // Match data includes scores and lines cleared
+                                    const matchData = {
+                                        winnerScore: ws.lost ? (opponent.lastScore || 0) : (ws.lastScore || 0),
+                                        loserScore: ws.lost ? (ws.lastScore || 0) : (opponent.lastScore || 0),
+                                        winnerLines: ws.lost ? (opponent.lastLines || 0) : (ws.lastLines || 0),
+                                        loserLines: ws.lost ? (ws.lastLines || 0) : (opponent.lastLines || 0)
+                                    };
+                                    
+                                    // Record match result
+                                    gameStatsModel.recordMatchResult(ws.userId, opponent.userId, winnerId, matchData)
+                                        .then(() => console.log(`Match result recorded: ${winnerId} won against ${loserId}`))
+                                        .catch(err => console.error('Error recording match result:', err));
+                                } catch (err) {
+                                    console.error('Error processing match result:', err);
+                                }
+                            }
+                            
                             gameRooms.delete(ws.roomId);
                         }
                         break;
@@ -311,6 +338,11 @@ wss.on('connection', (ws) => {
                         waitingPlayer = null;
                         sendMessage(ws, { type: 'status', payload: { message: 'Match search cancelled.' } });
                     }
+                    break;
+
+                case 'update_score':
+                    ws.lastScore = data.payload.score;
+                    ws.lastLines = data.payload.lines;
                     break;
 
                 default:
