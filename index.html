@@ -109,6 +109,36 @@
                 display: flex !important;
             }
         }
+        
+        /* Navigation links styling */
+        .nav-links {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .nav-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .nav-button:hover {
+            background-color: #3e8e41;
+        }
+        
+        @media screen and (max-width: 767px) {
+            .nav-links {
+                flex-direction: column;
+            }
+            
+            .nav-button {
+                margin-bottom: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -116,6 +146,12 @@
     <div id="status">Loading...</div> <!-- Status Indicator -->
 
     <div id="startScreen" style="text-align: center; margin-top: 50px;">
+        <!-- Navigation links to new features -->
+        <div class="nav-links" style="display: flex; justify-content: center; margin-bottom: 20px;">
+            <a href="login.html" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 10px;">Login/Register</a>
+            <a href="leaderboard.html" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 10px;">Leaderboard</a>
+        </div>
+        
         <div class="match-options">
             <button id="playPublicButton">Play Public Match</button>
             <button id="createPrivateButton">Create Private Match</button>
