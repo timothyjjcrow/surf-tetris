@@ -59,6 +59,26 @@
                 display: flex !important;
             }
         }
+        
+        /* Swipe Control Area Styling */
+        .swipe-control-area {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background-color: transparent; /* Make it invisible */
+            z-index: 1000;
+        }
+        
+        @media screen and (max-width: 800px), 
+               (orientation: portrait), 
+               (max-device-width: 800px) {
+            .swipe-control-area {
+                display: block !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -96,6 +116,9 @@
             <div id="mobileControls" class="mobile-controls">
                 <button id="holdBtn" class="mobile-control-btn">HOLD</button>
             </div>
+            
+            <!-- Swipe Control Area for bottom of screen -->
+            <div id="swipeControlArea" class="swipe-control-area"></div>
         </div>
         <div class="right-panel">
             <h2>Next</h2>
