@@ -1394,33 +1394,26 @@ function checkGameOver() {
             gameOver = true;
             updateStatus("Game Over!");
             
-            // Make sure to send a final score update before the game over message
-            sendScoreUpdate();
+            // Get user ID from localStorage
+            const userId = localStorage.getItem('tetris_user_id');
             
-            if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
-              // Get user ID from localStorage and ensure auth info is sent
-              const userId = localStorage.getItem('tetris_user_id');
-              const token = localStorage.getItem('tetris_token');
-              
-              // Re-send auth in case it wasn't established
-              if (userId && token) {
-                console.log("Re-sending authentication before game over");
-                sendMessageToServer('user_auth', { userId, token });
-                
-                // Small delay to ensure auth is processed
-                setTimeout(() => {
-                  sendMessageToServer("game_over", { 
-                    score, 
-                    linesCleared,
-                    userId: userId 
-                  });
-                  console.log("Sent game_over message to server with score:", score, "lines:", linesCleared, "userId:", userId);
-                }, 300);
-              } else {
-                // Still send game over but note the lack of auth
-                sendMessageToServer("game_over", { score, linesCleared });
-                console.log("Sent game_over message without user authentication");
-              }
+            // Always send the user ID with the game over message
+            if (userId) {
+              sendMessageToServer("game_over", { 
+                score,
+                linesCleared,
+                userId
+              });
+              console.log("Sent game_over message to server with score:", score, "lines:", linesCleared, "userId:", userId);
+            } else {
+              // Still try to send even without user ID, but log the issue
+              sendMessageToServer("game_over", { 
+                score, 
+                linesCleared,
+                // Send an empty user ID indicator to help with debugging
+                noUserId: true
+              });
+              console.log("WARNING: Sent game_over message without user ID. Authentication may be missing!");
             }
             
             playerLost = true;

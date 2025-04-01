@@ -249,25 +249,34 @@ wss.on('connection', (ws) => {
                 case 'game_over':
                     {
                         const currentRoom = gameRooms.get(ws.roomId);
-                        if (!currentRoom) { logAndIgnore(ws, data.type); break; }
+                        if (!currentRoom) { 
+                            console.error(`Game over received but room ${ws.roomId} not found`);
+                            logAndIgnore(ws, data.type); 
+                            break; 
+                        }
                         
                         // Check if userId was provided in the payload and use it
                         if (data.payload.userId) {
                             ws.userId = data.payload.userId;
                             console.log(`Updated user ID from game_over payload: ${ws.userId}`);
+                        } else {
+                            console.log(`No userId in payload. Current userId: ${ws.userId || 'not set'}`);
                         }
                         
                         console.log(`Room ${ws.roomId}: Player ${ws.playerNumber} game over. User ID: ${ws.userId || 'not set'}`);
+                        
                         // Mark player as lost
                         ws.lost = true;
                         
                         // Save score and lines in case they weren't updated recently
                         if (data.payload.score !== undefined) {
                             ws.lastScore = data.payload.score;
+                            console.log(`Player ${ws.playerNumber} final score: ${ws.lastScore}`);
                         }
                         
                         if (data.payload.linesCleared !== undefined) {
                             ws.lastLines = data.payload.linesCleared;
+                            console.log(`Player ${ws.playerNumber} final lines: ${ws.lastLines}`);
                         }
                         
                         // Check if the other player is still playing
@@ -307,9 +316,18 @@ wss.on('connection', (ws) => {
                                     console.log(`Recording match result: Player ${ws.userId} vs Player ${opponent.userId}`);
                                     console.log(`Player ${ws.userId} lost: ${ws.lost}, Player ${opponent.userId} lost: ${opponent.lost}`);
                                     
-                                    // Determine winner and loser IDs
-                                    const winnerId = ws.lost ? opponent.userId : ws.userId;
-                                    const loserId = ws.lost ? ws.userId : opponent.userId;
+                                    // Determine winner based on who is still playing (not lost)
+                                    let winnerId, loserId;
+                                    
+                                    // In case both players lost (e.g. disconnection), use the one with higher score
+                                    if (ws.lost && opponent.lost) {
+                                        winnerId = (ws.lastScore || 0) > (opponent.lastScore || 0) ? ws.userId : opponent.userId;
+                                        loserId = winnerId === ws.userId ? opponent.userId : ws.userId;
+                                        console.log(`Both players lost, winner determined by score. Winner: ${winnerId}`);
+                                    } else {
+                                        winnerId = ws.lost ? opponent.userId : ws.userId;
+                                        loserId = ws.lost ? ws.userId : opponent.userId;
+                                    }
                                     
                                     console.log(`Winner: ${winnerId}, Loser: ${loserId}`);
                                     console.log(`Player 1 score: ${ws.lastScore || 0}, Player 2 score: ${opponent.lastScore || 0}`);
