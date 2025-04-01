@@ -455,6 +455,24 @@ function handleServerMessage(message) {
       }
       break;
 
+    case "auth_error":
+      console.error("Authentication error:", message.payload.message);
+      // If token is invalid, clear it and redirect to login
+      if (message.payload.message && message.payload.message.includes("Invalid token")) {
+        console.warn("Token appears to be invalid, clearing authentication data");
+        localStorage.removeItem('tetris_token');
+        localStorage.removeItem('tetris_user_id');
+        // Only redirect if we're not already on the login page
+        if (!window.location.href.includes('login.html')) {
+          // Ask user if they want to log in again
+          const confirmLogin = confirm("Your login session has expired. Would you like to log in again?");
+          if (confirmLogin) {
+            window.location.href = 'login.html';
+          }
+        }
+      }
+      break;
+
     default:
       console.log(`Unknown message type from server: ${message.type}`);
   }

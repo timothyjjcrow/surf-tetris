@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'; // Change in production!
+const JWT_SECRET = process.env.JWT_SECRET || 'tetris-secret-key-12345'; // Using the same secret as server.js
 
 // Middleware to validate token
 const authenticateToken = (req, res, next) => {
