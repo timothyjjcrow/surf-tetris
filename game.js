@@ -1061,9 +1061,15 @@ function isTouchingGround() {
 
 // Update: Reset lock timer also if piece is on ground
 function startLockDelay() {
-  if (lockDelayTimer) return; // Don't restart if already running
+  if (lockDelayTimer) {
+    clearTimeout(lockDelayTimer); // Clear any existing timer first
+  }
+  
   // Check immediately if it should lock (prevents delay if already grounded for a while)
   if (!isTouchingGround()) return; // Only start if touching
+
+  // Use a shorter lock delay during speed-up to prevent pieces from sliding too much
+  const actualLockDelay = isSpeedUpActive ? Math.min(LOCK_DELAY, 300) : LOCK_DELAY;
 
   lockDelayTimer = setTimeout(() => {
     if (isTouchingGround()) {
@@ -1071,7 +1077,7 @@ function startLockDelay() {
       lockPiece();
     }
     lockDelayTimer = null;
-  }, LOCK_DELAY);
+  }, actualLockDelay);
 }
 
 function resetLockDelayIfTouching() {
@@ -1296,27 +1302,6 @@ function gameLoop(timestamp = 0) {
 
   // Request next frame
   animationFrameId = requestAnimationFrame(gameLoop);
-}
-
-// Modify startLockDelay to ensure consistent behavior during speed-up
-function startLockDelay() {
-  if (lockDelayTimer) {
-    clearTimeout(lockDelayTimer); // Clear any existing timer first
-  }
-  
-  // Check immediately if it should lock (prevents delay if already grounded for a while)
-  if (!isTouchingGround()) return; // Only start if touching
-
-  // Use a shorter lock delay during speed-up to prevent pieces from sliding too much
-  const actualLockDelay = isSpeedUpActive ? Math.min(LOCK_DELAY, 300) : LOCK_DELAY;
-
-  lockDelayTimer = setTimeout(() => {
-    if (isTouchingGround()) {
-      // Double-check if still touching when timer expires
-      lockPiece();
-    }
-    lockDelayTimer = null;
-  }, actualLockDelay);
 }
 
 // Activate speed-up attack
