@@ -44,6 +44,20 @@ function updateAuthUI(isLoggedIn, username = '') {
     if (loginPrompt) {
         loginPrompt.style.display = isLoggedIn ? 'none' : 'block';
     }
+    
+    // Handle game options and login required message (for index.html)
+    const gameOptions = document.getElementById('game-options');
+    const loginRequiredMessage = document.getElementById('login-required-message');
+    
+    if (gameOptions && loginRequiredMessage) {
+        if (isLoggedIn) {
+            gameOptions.style.display = 'block';
+            loginRequiredMessage.style.display = 'none';
+        } else {
+            gameOptions.style.display = 'none';
+            loginRequiredMessage.style.display = 'block';
+        }
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

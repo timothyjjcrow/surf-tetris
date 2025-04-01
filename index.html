@@ -165,16 +165,25 @@
             <a href="leaderboard.html" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 10px;">Leaderboard</a>
         </div>
         
-        <div class="match-options">
-            <button id="playPublicButton">Play Public Match</button>
-            <button id="createPrivateButton">Create Private Match</button>
+        <!-- Login required message -->
+        <div id="login-required-message" style="display: none; margin: 30px auto; padding: 20px; max-width: 500px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; color: #721c24;">
+            <h3>Login Required</h3>
+            <p>You must <a href="login.html" style="color: #721c24; font-weight: bold;">login or register</a> to play Tetris Battle and track your stats on the leaderboard.</p>
         </div>
-        <div class="private-join">
-            <input type="text" id="roomCodeInput" placeholder="Enter Room Code" maxlength="4">
-            <button id="joinPrivateButton">Join Private Match</button>
-        </div>
-        <div id="privateRoomInfo" style="margin-top: 15px; font-weight: bold; display: none;">
-            <!-- Room code will be displayed here -->
+        
+        <!-- Game options (will only be shown to logged-in users) -->
+        <div id="game-options" style="display: none;">
+            <div class="match-options">
+                <button id="playPublicButton">Play Public Match</button>
+                <button id="createPrivateButton">Create Private Match</button>
+            </div>
+            <div class="private-join">
+                <input type="text" id="roomCodeInput" placeholder="Enter Room Code" maxlength="4">
+                <button id="joinPrivateButton">Join Private Match</button>
+            </div>
+            <div id="privateRoomInfo" style="margin-top: 15px; font-weight: bold; display: none;">
+                <!-- Room code will be displayed here -->
+            </div>
         </div>
         
         <!-- Control Instructions -->
