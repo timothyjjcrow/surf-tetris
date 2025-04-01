@@ -161,39 +161,41 @@
             <a href="login.html">Login / Register</a>
         </div>
         
-        <div id="profile-section" class="profile-info" style="display: none;">
-            <div class="profile-heading">
-                <h2>My Stats</h2>
-                <span id="player-rank"></span>
+        <div id="leaderboard-container">
+            <div id="profile-section" class="profile-info" style="display: none;">
+                <div class="profile-heading">
+                    <h2>My Stats</h2>
+                    <span id="player-rank"></span>
+                </div>
+                <p>Username: <span id="profile-username"></span></p>
+                <p>ELO Rating: <span id="profile-elo"></span></p>
+                <p>Wins: <span id="profile-wins"></span></p>
+                <p>Losses: <span id="profile-losses"></span></p>
+                <p>Win Rate: <span id="profile-winrate"></span>%</p>
             </div>
-            <p>Username: <span id="profile-username"></span></p>
-            <p>ELO Rating: <span id="profile-elo"></span></p>
-            <p>Wins: <span id="profile-wins"></span></p>
-            <p>Losses: <span id="profile-losses"></span></p>
-            <p>Win Rate: <span id="profile-winrate"></span>%</p>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2>Top Players</h2>
+            </div>
+            
+            <table class="leaderboard">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>ELO Rating</th>
+                        <th>Wins</th>
+                        <th>Losses</th>
+                        <th>Win Rate</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                    <tr class="loading">
+                        <td colspan="6">Loading leaderboard data...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h2>Top Players</h2>
-        </div>
-        
-        <table class="leaderboard">
-            <thead>
-                <tr>
-                    <th>Rank</th>
-                    <th>Player</th>
-                    <th>ELO Rating</th>
-                    <th>Wins</th>
-                    <th>Losses</th>
-                    <th>Win Rate</th>
-                </tr>
-            </thead>
-            <tbody id="leaderboard-body">
-                <tr class="loading">
-                    <td colspan="6">Loading leaderboard data...</td>
-                </tr>
-            </tbody>
-        </table>
     </div>
     
     <script>
