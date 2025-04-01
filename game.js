@@ -1811,6 +1811,12 @@ function showStartScreen() {
   privateRoomInfo.style.display = "none"; // Hide room code info
   roomCodeInput.value = ""; // Clear input
   enableStartScreen(); // Ensure buttons are enabled
+  
+  // Show the logo when returning to the start screen
+  const logoElement = document.getElementById("game-logo");
+  if (logoElement) {
+    logoElement.style.display = "block";
+  }
 }
 
 function hideStartScreen() {
@@ -1821,6 +1827,12 @@ function showGameArea() {
   // Hide start screen and show game area
   hideStartScreen();
   gameAreaElement.style.display = "flex";
+  
+  // Hide the logo during gameplay
+  const logoElement = document.getElementById("game-logo");
+  if (logoElement) {
+    logoElement.style.display = "none";
+  }
   
   // Show mobile controls when game area is visible
   if (mobileControls) {
