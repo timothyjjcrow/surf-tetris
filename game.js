@@ -83,6 +83,69 @@ notificationStyle.textContent = `
   .error-notification {
     background-color: #FF0000; /* Red for error */
   }
+  /* Shake effect animation for scramble attack */
+  @keyframes shake {
+    0% { transform: translate(0, 0); }
+    10% { transform: translate(-5px, -5px); }
+    20% { transform: translate(5px, -5px); }
+    30% { transform: translate(-5px, 5px); }
+    40% { transform: translate(5px, 5px); }
+    50% { transform: translate(-5px, -5px); }
+    60% { transform: translate(5px, -5px); }
+    70% { transform: translate(-5px, 5px); }
+    80% { transform: translate(5px, 5px); }
+    90% { transform: translate(-5px, 0); }
+    100% { transform: translate(0, 0); }
+  }
+  .shake-effect {
+    animation: shake 0.8s cubic-bezier(.36,.07,.19,.97) both;
+    animation-iteration-count: 3;
+    transform-origin: center;
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+  /* Speed lines effect for speed-up attack */
+  @keyframes speedLines {
+    0% { 
+      background-position: 0 0;
+      opacity: 0.2;
+    }
+    50% {
+      opacity: 0.5;
+    }
+    100% { 
+      background-position: 100px 0;
+      opacity: 0.2;
+    }
+  }
+  .speed-lines-effect {
+    position: relative;
+  }
+  .speed-lines-effect::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: linear-gradient(90deg, transparent 0%, transparent 40%, rgba(255, 0, 0, 0.8) 40%, transparent 41%,
+                                      transparent 60%, rgba(255, 0, 0, 0.8) 60%, transparent 61%,
+                                      transparent 80%, rgba(255, 0, 0, 0.8) 80%, transparent 81%);
+    background-size: 100px 100%;
+    animation: speedLines 0.5s linear infinite;
+    z-index: 2;
+    pointer-events: none;
+  }
+  /* Style for speed boost indicator */
+  .speed-boost {
+    color: #F44336;
+    font-weight: bold;
+    animation: pulse 0.5s infinite alternate;
+  }
+  @keyframes pulse {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+  }
 `;
 document.head.appendChild(notificationStyle);
 
@@ -1616,13 +1679,155 @@ function activateSpeedUp(duration) {
   if (isSpeedUpActive) return; // Don't activate if already active
   
   isSpeedUpActive = true;
-  speedUpTimer = setTimeout(() => {
-    isSpeedUpActive = false;
-    dropInterval = baseDropInterval;
-  }, duration * 1000); // Convert seconds to milliseconds
   
+  // Store original drop interval
+  const originalDropInterval = dropInterval;
   baseDropInterval = dropInterval;
-  dropInterval = Math.max(50, dropInterval / 2); // Reduce drop interval by half
+  
+  // Apply progressive speed-up effect for more dramatic impact
+  const applySpeedUpEffect = (progress) => {
+    // Calculate current factor based on progress (0 to 1)
+    // Start with a strong initial boost, then gradually increase to maximum
+    const currentFactor = 1.5 + (SPEEDUP_FACTOR - 1.5) * progress;
+    dropInterval = Math.max(50, originalDropInterval / currentFactor);
+    
+    // Update UI to reflect current speed factor
+    updateSpeedDisplay(currentFactor);
+  };
+  
+  // Create function to update speed display
+  const updateSpeedDisplay = (factor) => {
+    // Update score/stats display with current speed factor
+    if (scoreElement) {
+      const speedIndicator = Math.floor((factor - 1) * 100);
+      const currentScore = parseInt(scoreElement.textContent.split(':')[1].trim());
+      scoreElement.innerHTML = `Score: ${currentScore} <span class="speed-boost">+${speedIndicator}% SPEED!</span>`;
+    }
+  };
+  
+  // Create speedup effect overlay
+  const speedUpOverlay = document.createElement('div');
+  speedUpOverlay.className = 'speed-effect-overlay';
+  speedUpOverlay.style.position = 'absolute';
+  speedUpOverlay.style.top = '0';
+  speedUpOverlay.style.left = '0';
+  speedUpOverlay.style.width = '100%';
+  speedUpOverlay.style.height = '100%';
+  speedUpOverlay.style.pointerEvents = 'none';
+  speedUpOverlay.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+  speedUpOverlay.style.zIndex = '10';
+  
+  // Add blur effect for more intensity
+  gameCanvas.style.filter = 'blur(1px)';
+  // Add speed lines effect
+  gameCanvas.classList.add('speed-lines-effect');
+  
+  // Add the overlay to the canvas container
+  gameCanvas.parentElement.appendChild(speedUpOverlay);
+  
+  // Visual indicator for progress
+  const progressBar = document.createElement('div');
+  progressBar.style.position = 'absolute';
+  progressBar.style.bottom = '0';
+  progressBar.style.left = '0';
+  progressBar.style.height = '5px';
+  progressBar.style.width = '100%';
+  progressBar.style.backgroundColor = 'rgb(255, 50, 50)';
+  progressBar.style.opacity = '0.8';
+  progressBar.style.zIndex = '11';
+  progressBar.style.transition = 'width linear';
+  speedUpOverlay.appendChild(progressBar);
+  
+  // Start with an immediate speed change
+  applySpeedUpEffect(0.5); // Start at 50% of max effect
+  
+  // Create a heartbeat/pulse effect to emphasize the urgency
+  let pulseCount = 0;
+  const pulseInterval = setInterval(() => {
+    if (!isSpeedUpActive) {
+      clearInterval(pulseInterval);
+      return;
+    }
+    
+    // Create pulse effect
+    gameCanvas.style.transform = 'scale(1.01)';
+    setTimeout(() => {
+      if (gameCanvas) {
+        gameCanvas.style.transform = 'scale(1)';
+      }
+    }, 150);
+    
+    // Increase speed gradually with each pulse
+    pulseCount++;
+    if (pulseCount <= 5) {
+      // Progressive speed increase
+      applySpeedUpEffect(0.5 + (pulseCount * 0.1)); // 0.5, 0.6, 0.7, 0.8, 0.9, 1.0
+    }
+  }, 2000); // Pulse every 2 seconds
+  
+  // Update progress bar to show time remaining
+  const startTime = Date.now();
+  const updateInterval = setInterval(() => {
+    if (!isSpeedUpActive) {
+      clearInterval(updateInterval);
+      return;
+    }
+    
+    const elapsed = Date.now() - startTime;
+    const timeLeft = Math.max(0, duration * 1000 - elapsed);
+    const widthPercentage = (timeLeft / (duration * 1000)) * 100;
+    progressBar.style.width = `${widthPercentage}%`;
+    
+    // Faster flashing as time runs out
+    if (widthPercentage < 30) {
+      progressBar.style.opacity = Math.random() > 0.5 ? '1' : '0.4';
+    }
+  }, 100);
+  
+  // Set timeout to deactivate the speed-up
+  speedUpTimer = setTimeout(() => {
+    // Gradually restore normal speed (smooth transition)
+    const transitionSteps = 5;
+    const stepDuration = 300; // ms
+    
+    const transitionInterval = setInterval(() => {
+      const currentTransitionStep = transitionSteps - 1;
+      if (currentTransitionStep <= 0) {
+        clearInterval(transitionInterval);
+        dropInterval = baseDropInterval;
+        isSpeedUpActive = false;
+        
+        // Remove all visual effects
+        if (gameCanvas) {
+          gameCanvas.style.filter = 'none';
+          gameCanvas.style.transform = 'scale(1)';
+          gameCanvas.classList.remove('speed-lines-effect');
+          
+          // Remove our speed effect overlay
+          if (speedUpOverlay.parentElement) {
+            speedUpOverlay.parentElement.removeChild(speedUpOverlay);
+          }
+          
+          // Reset score display
+          if (scoreElement) {
+            const currentScore = parseInt(scoreElement.textContent.split(':')[1].trim());
+            scoreElement.textContent = `Score: ${currentScore}`;
+          }
+        }
+        
+        // Clear our intervals
+        clearInterval(pulseInterval);
+        clearInterval(updateInterval);
+        
+        return;
+      }
+      
+      const factor = 1 + ((SPEEDUP_FACTOR - 1) * (currentTransitionStep / transitionSteps));
+      dropInterval = Math.max(50, baseDropInterval / factor);
+      
+      transitionSteps--;
+    }, stepDuration);
+  }, duration * 1000); // Convert seconds to milliseconds
 }
 
 // Activate scramble attack
@@ -1695,7 +1900,7 @@ function scrambleCurrentBoard(intensity) {
   
   // 2. Scramble individual rows by swapping blocks WITHIN THE SAME ROW
   // This preserves the "gravity" of Tetris since no blocks float
-  for (let i = 0; i < Math.min(intensity, rowsWithBlocks.length * 2); i++) {
+  for (let i = 0; i < Math.min(intensity, rowsWithBlocks.length * 3); i++) {
     // Pick a random row that has blocks
     const randomIndex = Math.floor(Math.random() * rowsWithBlocks.length);
     const row = rowsWithBlocks[randomIndex];
@@ -1726,12 +1931,82 @@ function scrambleCurrentBoard(intensity) {
     }
   }
   
-  // 3. Add a visual effect by flashing the board
+  // 3. NEW: Occasionally swap entire rows (that are both occupied)
+  // This is more disruptive but still preserves Tetris physics
+  if (rowsWithBlocks.length >= 2 && Math.random() < 0.7) {
+    for (let i = 0; i < Math.min(3, Math.floor(rowsWithBlocks.length / 2)); i++) {
+      const row1Index = Math.floor(Math.random() * rowsWithBlocks.length);
+      let row2Index = Math.floor(Math.random() * rowsWithBlocks.length);
+      
+      // Make sure we're swapping different rows
+      while (row2Index === row1Index) {
+        row2Index = Math.floor(Math.random() * rowsWithBlocks.length);
+      }
+      
+      const row1 = rowsWithBlocks[row1Index];
+      const row2 = rowsWithBlocks[row2Index];
+      
+      // Swap entire rows
+      [board[row1], board[row2]] = [board[row2], board[row1]];
+    }
+  }
+  
+  // 4. NEW: Color scrambling - change the color/type of some blocks
+  // This adds visual confusion without affecting physics
+  for (let i = 0; i < intensity; i++) {
+    if (rowsWithBlocks.length > 0) {
+      const randomRowIndex = Math.floor(Math.random() * rowsWithBlocks.length);
+      const row = rowsWithBlocks[randomRowIndex];
+      
+      // Find a non-empty cell
+      const blocksInRow = [];
+      for (let c = 0; c < COLS; c++) {
+        if (board[row][c] !== 0) {
+          blocksInRow.push(c);
+        }
+      }
+      
+      if (blocksInRow.length > 0) {
+        const col = blocksInRow[Math.floor(Math.random() * blocksInRow.length)];
+        // Change the block to a random tetromino color (1-7)
+        const newColor = Math.floor(Math.random() * 7) + 1;
+        board[row][col] = newColor;
+      }
+    }
+  }
+  
+  // 5. Add enhanced visual effects by flashing the board
   const boardBackup = gameCanvas.style.border || 'none';
-  gameCanvas.style.border = '3px solid #FF9800'; // Orange border
+  const effectDuration = 1500; // Longer effect duration
+  
+  // Add a shake effect to the canvas
+  gameCanvas.classList.add('shake-effect');
+  
+  // Flashing effect
+  gameCanvas.style.border = '4px solid #FF5722'; // Brighter orange border
+  
+  // Add a brief screen flash
+  const flashOverlay = document.createElement('div');
+  flashOverlay.style.position = 'fixed';
+  flashOverlay.style.top = '0';
+  flashOverlay.style.left = '0';
+  flashOverlay.style.width = '100%';
+  flashOverlay.style.height = '100%';
+  flashOverlay.style.backgroundColor = 'rgba(255, 165, 0, 0.2)'; // Semi-transparent orange
+  flashOverlay.style.zIndex = '9999';
+  flashOverlay.style.pointerEvents = 'none'; // Don't block interaction
+  document.body.appendChild(flashOverlay);
+  
+  // Remove the flash effect after a short time
+  setTimeout(() => {
+    document.body.removeChild(flashOverlay);
+  }, 400);
+  
+  // Remove effects after the duration
   setTimeout(() => {
     gameCanvas.style.border = boardBackup; // Restore original border
-  }, 500);
+    gameCanvas.classList.remove('shake-effect');
+  }, effectDuration);
   
   // Redraw the board with scrambled blocks
   drawBoard();
@@ -1739,8 +2014,7 @@ function scrambleCurrentBoard(intensity) {
   // Reset scramble active flag after a delay
   scrambleTimer = setTimeout(() => {
     isScrambleActive = false;
-    gameCanvas.style.border = boardBackup;
-  }, 5000);
+  }, effectDuration);
 }
 
 // Reset the game for a new match
