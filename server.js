@@ -139,10 +139,35 @@ wss.on('connection', (ws) => {
                         break;
                     }
                     
+                    // First, clear any existing references to this client in the waiting list
+                    if (waitingPlayer === ws) {
+                        // If the same client is clicking the button again, just ignore
+                        console.log(`Player ${ws.userId} already waiting for public match.`);
+                        sendMessage(ws, { 
+                            type: 'status', 
+                            payload: { 
+                                message: 'Already searching for match...', 
+                                matchmaking: true 
+                            } 
+                        });
+                        break;
+                    }
+                    
+                    // Clear waitingPlayer if their connection is closed
+                    if (waitingPlayer && waitingPlayer.readyState !== WebSocket.OPEN) {
+                        console.log("Clearing disconnected waiting player");
+                        waitingPlayer = null;
+                    }
+                    
                     // If we have a waiting player, check it's not the same user on a different connection
-                    if (waitingPlayer && waitingPlayer !== ws) {
+                    if (waitingPlayer) {
+                        // Double-check the connection is still open
+                        if (waitingPlayer.readyState !== WebSocket.OPEN) {
+                            console.log("Waiting player connection closed, clearing reference");
+                            waitingPlayer = null;
+                        }
                         // Prevent matching with yourself (same userId)
-                        if (waitingPlayer.userId === ws.userId) {
+                        else if (waitingPlayer.userId === ws.userId) {
                             console.log(`Player (${ws.userId}) tried to match with themselves on a different connection`);
                             sendMessage(ws, { 
                                 type: 'error', 
@@ -150,20 +175,27 @@ wss.on('connection', (ws) => {
                             });
                             break;
                         }
-                        
-                        console.log("Found waiting player, creating public room...");
-                        const player1 = waitingPlayer;
-                        const player2 = ws;
-                        waitingPlayer = null;
-                        createRoom(player1, player2, 'public');
-                    } else if (waitingPlayer === ws) {
-                        console.log("Player already waiting for public match.");
-                        sendMessage(ws, { type: 'status', payload: { message: 'Already searching for match...' } });
-                    } else {
-                        console.log(`Player ${ws.userId} added to waitlist.`);
-                        waitingPlayer = ws;
-                        sendMessage(ws, { type: 'status', payload: { message: 'Waiting for opponent... ' } });
+                        else {
+                            // Valid match found!
+                            console.log(`Found waiting player ${waitingPlayer.userId}, creating public room with ${ws.userId}...`);
+                            const player1 = waitingPlayer;
+                            const player2 = ws;
+                            waitingPlayer = null; // Clear waitingPlayer reference
+                            createRoom(player1, player2, 'public');
+                            break;
+                        }
                     }
+                    
+                    // If we get here, there's no valid waiting player, so become the waiting player
+                    console.log(`Player ${ws.userId} added to waitlist.`);
+                    waitingPlayer = ws;
+                    sendMessage(ws, { 
+                        type: 'status', 
+                        payload: { 
+                            message: 'Waiting for opponent... ', 
+                            matchmaking: true 
+                        }
+                    });
                     break;
 
                 case 'create_private_match':
@@ -610,6 +642,12 @@ wss.on('connection', (ws) => {
         const playerNumber = ws.playerNumber;
         
         console.log(`Client disconnected. Room: ${roomId || 'null'}, Player: ${playerNumber || 'null'}. Rooms left: ${gameRooms.size}`);
+        
+        // Clear waitingPlayer if this client was waiting
+        if (waitingPlayer === ws) {
+            console.log(`Clearing waiting player ${ws.userId || 'unknown'} due to disconnect`);
+            waitingPlayer = null;
+        }
         
         // If this client was in a room, notify the other player and handle cleanup
         if (roomId) {

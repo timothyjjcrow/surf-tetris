@@ -342,15 +342,15 @@ function handleServerMessage(message) {
       break;
 
     case "private_match_created":
-      if (message.payload.roomCode) {
-        displayRoomCode(message.payload.roomCode);
-        updateStatus(
-          `Private room created. Share code: ${message.payload.roomCode}`
-        );
-      } else {
-        updateStatus("Error creating private room.");
-        enableStartScreen(); // Re-enable buttons on error
-      }
+      // Display the room code in a more prominent way
+      updateStatus(`Private room created! Share code: ${message.payload.roomCode}`);
+      privateRoomInfo.innerHTML = `
+        <div style="background-color: rgba(0,0,0,0.7); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; color: #4CAF50;">Room Code: ${message.payload.roomCode}</h3>
+          <p>Share this code with a friend to play! Waiting for opponent...</p>
+        </div>
+      `;
+      privateRoomInfo.style.display = "block";
       break;
 
     case "error":
@@ -482,22 +482,80 @@ function handleServerMessage(message) {
 
     case "status": // General status updates from server
       updateStatus(message.payload.message);
-      // Keep start screen enabled unless matchmaking is actively in progress
-      // (disableStartScreen is called explicitly when sending match requests)
-      if (!gameStarted && startScreen.style.display !== "none") {
-        // Don't re-enable if we're *already* disabled waiting for match_found
-        const anyButtonDisabled =
-          playPublicButton.disabled ||
-          createPrivateButton.disabled ||
-          joinPrivateButton.disabled;
-        if (!anyButtonDisabled) {
-          enableStartScreen();
+      
+      // Check if this is a matchmaking status update
+      if (message.payload.matchmaking === true) {
+        showMatchmakingState(true);
+      } else {
+        // Keep start screen enabled unless matchmaking is actively in progress
+        // (disableStartScreen is called explicitly when sending match requests)
+        if (!gameStarted && startScreen.style.display !== "none") {
+          // Don't re-enable if we're *already* disabled waiting for match_found
+          const anyButtonDisabled =
+            playPublicButton.disabled ||
+            createPrivateButton.disabled ||
+            joinPrivateButton.disabled;
+          if (!anyButtonDisabled) {
+            enableStartScreen();
+          }
         }
       }
       break;
 
     default:
       console.log(`Unknown message type from server: ${message.type}`);
+  }
+}
+
+// Handle matchmaking button state
+function showMatchmakingState(isMatchmaking) {
+  if (isMatchmaking) {
+    // Disable all matchmaking buttons during matchmaking
+    playPublicButton.disabled = true;
+    createPrivateButton.disabled = true;
+    joinPrivateButton.disabled = true;
+    
+    // Add visual indicators for matchmaking state
+    playPublicButton.style.opacity = "0.5";
+    createPrivateButton.style.opacity = "0.5";
+    joinPrivateButton.style.opacity = "0.5";
+    
+    // Show a spinner or other visual indicator next to the play button
+    if (!document.getElementById("matchmaking-spinner")) {
+      const spinner = document.createElement("div");
+      spinner.id = "matchmaking-spinner";
+      spinner.innerHTML = "⟳"; // Simple spinner character
+      spinner.style.display = "inline-block";
+      spinner.style.marginLeft = "10px";
+      spinner.style.animation = "spin 1s linear infinite";
+      playPublicButton.parentNode.insertBefore(spinner, playPublicButton.nextSibling);
+      
+      // Add the spin animation
+      const styleElement = document.createElement("style");
+      styleElement.textContent = `
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(styleElement);
+    }
+  } else {
+    // Re-enable buttons when matchmaking ends
+    playPublicButton.disabled = false;
+    createPrivateButton.disabled = false;
+    joinPrivateButton.disabled = false;
+    
+    // Restore normal appearance
+    playPublicButton.style.opacity = "1";
+    createPrivateButton.style.opacity = "1";
+    joinPrivateButton.style.opacity = "1";
+    
+    // Remove the spinner if it exists
+    const spinner = document.getElementById("matchmaking-spinner");
+    if (spinner) {
+      spinner.remove();
+    }
   }
 }
 
@@ -1336,11 +1394,7 @@ function handlePlayPublic() {
     if (ws && ws.readyState === WebSocket.OPEN) {
       sendMessageToServer("find_public_match");
       updateStatus("Finding opponent...");
-      
-      // Ensure button remains disabled
-      playPublicButton.disabled = true;
-      playPublicButton.style.opacity = "0.5";
-      playPublicButton.style.cursor = "not-allowed";
+      showMatchmakingState(true);
     } else {
       updateStatus("Connection failed. Try again.");
       searchingForMatch = false; // Reset search state
@@ -1358,6 +1412,7 @@ function handleCreatePrivate() {
   console.log("Requesting private match creation...");
   sendMessageToServer("create_private_match");
   updateStatus("Creating private match...");
+  showMatchmakingState(true);
   disableStartScreen();
 }
 
@@ -1378,6 +1433,7 @@ function handleJoinPrivate() {
   console.log(`Attempting to join private match with code: ${roomCode}...`);
   sendMessageToServer("join_private_match", { roomCode });
   updateStatus(`Joining room ${roomCode}...`);
+  showMatchmakingState(true);
   disableStartScreen();
 }
 
