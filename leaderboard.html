@@ -133,6 +133,15 @@
         .login-prompt a:hover {
             text-decoration: underline;
         }
+        
+        .refresh-btn {
+            background-color: #00FF00;
+            color: black;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -140,6 +149,7 @@
         <header>
             <h1>Tetris Battle Leaderboard</h1>
             <div class="nav-links">
+                <button id="refresh-leaderboard" class="refresh-btn">Refresh Leaderboard</button>
                 <a href="index.html">Play Game</a>
                 <a href="#" id="profile-link">My Profile</a>
                 <a href="#" id="logout-link">Logout</a>
@@ -165,9 +175,6 @@
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <h2>Top Players</h2>
-            <button id="refresh-leaderboard" style="background-color: #00FF00; color: black; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">
-                Refresh Leaderboard
-            </button>
         </div>
         
         <table class="leaderboard">
@@ -190,52 +197,67 @@
     </div>
     
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const token = localStorage.getItem('tetris_token');
+        document.addEventListener('DOMContentLoaded', function() {
             const userId = localStorage.getItem('tetris_user_id');
-            const username = localStorage.getItem('tetris_username');
+            const token = localStorage.getItem('tetris_token');
             
-            const loginPrompt = document.getElementById('login-prompt');
-            const profileSection = document.getElementById('profile-section');
-            const profileLink = document.getElementById('profile-link');
-            const logoutLink = document.getElementById('logout-link');
-            
-            // Handle authentication UI
-            if (token) {
-                loginPrompt.style.display = 'none';
-                profileSection.style.display = 'block';
-                document.getElementById('profile-username').textContent = username;
-                
-                // Fetch user profile data
-                fetchUserProfile();
+            // Check if user is logged in
+            if (!token) {
+                document.getElementById('leaderboard-container').style.display = 'none';
+                document.getElementById('login-prompt').style.display = 'block';
             } else {
-                loginPrompt.style.display = 'block';
-                profileSection.style.display = 'none';
-                profileLink.style.display = 'none';
-                logoutLink.style.display = 'none';
+                document.getElementById('leaderboard-container').style.display = 'block';
+                document.getElementById('login-prompt').style.display = 'none';
+                
+                // Set event listeners
+                document.getElementById('logout-link').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    localStorage.removeItem('tetris_token');
+                    localStorage.removeItem('tetris_user_id');
+                    localStorage.removeItem('tetris_username');
+                    window.location.href = 'login.html';
+                });
+                
+                document.getElementById('profile-link').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    fetchUserProfile();
+                });
+                
+                // Add refresh button event listener
+                document.getElementById('refresh-leaderboard').addEventListener('click', function() {
+                    console.log('Refreshing leaderboard data...');
+                    this.textContent = 'Refreshing...';
+                    this.disabled = true;
+                    
+                    fetchLeaderboard().finally(() => {
+                        this.textContent = 'Refresh Leaderboard';
+                        this.disabled = false;
+                    });
+                });
             }
-            
-            // Logout handler
-            logoutLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                localStorage.removeItem('tetris_token');
-                localStorage.removeItem('tetris_user_id');
-                localStorage.removeItem('tetris_username');
-                window.location.reload();
-            });
-            
-            // Refresh leaderboard handler
-            document.getElementById('refresh-leaderboard').addEventListener('click', () => {
-                fetchLeaderboard();
-            });
             
             // Fetch leaderboard data
             fetchLeaderboard();
             
             async function fetchLeaderboard() {
                 try {
+                    const leaderboardBody = document.getElementById('leaderboard-body');
+                    leaderboardBody.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="text-align: center;">Loading leaderboard data...</td>
+                        </tr>
+                    `;
+                    
+                    // Always fetch from the real endpoint, not the test one
+                    const endpoint = '/api/stats/leaderboard';
+                    
                     // Add cache-busting parameter to prevent browser caching
-                    const response = await fetch('/api/stats/leaderboard?t=' + new Date().getTime());
+                    const response = await fetch(`${endpoint}?t=${new Date().getTime()}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    
                     if (!response.ok) {
                         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
                     }
@@ -246,12 +268,13 @@
                         throw new Error('Invalid leaderboard data');
                     }
                     
+                    console.log('Leaderboard data received:', leaderboardData);
                     displayLeaderboard(leaderboardData);
                 } catch (error) {
                     console.error('Error fetching leaderboard:', error);
                     document.getElementById('leaderboard-body').innerHTML = `
                         <tr class="error">
-                            <td colspan="6">Error loading leaderboard data. Please try again later.</td>
+                            <td colspan="6">Error loading leaderboard data: ${error.message}. Please try refreshing.</td>
                         </tr>
                     `;
                 }

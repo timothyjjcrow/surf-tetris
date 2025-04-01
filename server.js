@@ -330,21 +330,38 @@ wss.on('connection', (ws) => {
                                     
                                     // Record match result
                                     gameStatsModel.recordMatchResult(ws.userId, opponent.userId, winnerId, matchData)
-                                        .then(() => {
-                                            console.log(`Match result recorded: ${winnerId} won against ${loserId}`);
-                                            
-                                            // Send update notification to both players
-                                            const updateMsg = {
-                                                type: 'stats_updated',
-                                                payload: { message: 'Your stats have been updated!' }
-                                            };
-                                            
-                                            if (ws.readyState === WebSocket.OPEN) {
-                                                sendMessage(ws, updateMsg);
-                                            }
-                                            
-                                            if (opponent.readyState === WebSocket.OPEN) {
-                                                sendMessage(opponent, updateMsg);
+                                        .then((result) => {
+                                            if (result.success) {
+                                                console.log(`Match result recorded: ${winnerId} won against ${loserId}`);
+                                                console.log('ELO changes:', {
+                                                    player1EloChange: result.player1EloChange || 0,
+                                                    player2EloChange: result.player2EloChange || 0
+                                                });
+                                                
+                                                // Send update notification to both players
+                                                const updateMsg = {
+                                                    type: 'stats_updated',
+                                                    payload: {
+                                                        message: 'Your stats have been updated!',
+                                                        eloChange: 0 // Will be updated below
+                                                    }
+                                                };
+                                                
+                                                if (ws.readyState === WebSocket.OPEN) {
+                                                    // Add ELO info specific to this player
+                                                    updateMsg.payload.eloChange = 
+                                                        ws.userId === winnerId ? result.player1EloChange : result.player2EloChange;
+                                                    sendMessage(ws, updateMsg);
+                                                }
+                                                
+                                                if (opponent && opponent.readyState === WebSocket.OPEN) {
+                                                    // Add ELO info specific to opponent
+                                                    updateMsg.payload.eloChange = 
+                                                        opponent.userId === winnerId ? result.player1EloChange : result.player2EloChange;
+                                                    sendMessage(opponent, updateMsg);
+                                                }
+                                            } else {
+                                                console.error('Failed to record match result:', result.error);
                                             }
                                         })
                                         .catch(err => {

@@ -9,14 +9,20 @@ const router = express.Router();
 // Get leaderboard
 router.get('/leaderboard', async (req, res) => {
   try {
+    console.log('Leaderboard request received');
     const limit = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
     
+    // Force refresh from database
     const result = await gameStatsModel.getLeaderboard(limit, offset);
     
     if (!result.success) {
+      console.error('Leaderboard fetch error from model:', result.error);
       return res.status(500).json({ error: result.error });
     }
+    
+    // Log the result for debugging
+    console.log(`Returning leaderboard with ${result.leaderboard.length} entries`);
     
     res.json(result.leaderboard);
   } catch (error) {
