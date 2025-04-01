@@ -77,7 +77,7 @@ app.get('/api/stats/test-leaderboard', (req, res) => {
 // Store active game rooms and waiting player
 let gameRooms = new Map(); // roomId -> { id: string, player1: ws, player2: ws, roomType: 'public'|'private', /* other room state */ }
 let waitingPlayer = null;   // Holds the WebSocket of the player waiting for a public match
-let privateRooms = new Map(); // roomCode -> { creatorWs: ws, roomId: string | null } (roomId is null until joined)
+let privateRooms = new Map(); // roomCode -> { creatorWs: ws, creatorId: string, roomId: string | null } (roomId is null until joined)
 let roomIdCounter = 1;
 
 // Track authenticated users
@@ -129,7 +129,28 @@ wss.on('connection', (ws) => {
 
                 // -- Matchmaking Messages (No room check needed) --
                 case 'find_public_match':
+                    // Check if the player is authenticated - required for matchmaking
+                    if (!ws.userId) {
+                        console.log("Unauthenticated player tried to find a match");
+                        sendMessage(ws, { 
+                            type: 'error', 
+                            payload: { message: 'You must be logged in to play matches.' }
+                        });
+                        break;
+                    }
+                    
+                    // If we have a waiting player, check it's not the same user on a different connection
                     if (waitingPlayer && waitingPlayer !== ws) {
+                        // Prevent matching with yourself (same userId)
+                        if (waitingPlayer.userId === ws.userId) {
+                            console.log(`Player (${ws.userId}) tried to match with themselves on a different connection`);
+                            sendMessage(ws, { 
+                                type: 'error', 
+                                payload: { message: 'Cannot play against yourself!' }
+                            });
+                            break;
+                        }
+                        
                         console.log("Found waiting player, creating public room...");
                         const player1 = waitingPlayer;
                         const player2 = ws;
@@ -139,31 +160,62 @@ wss.on('connection', (ws) => {
                         console.log("Player already waiting for public match.");
                         sendMessage(ws, { type: 'status', payload: { message: 'Already searching for match...' } });
                     } else {
-                        console.log("No waiting player, adding current player to waitlist.");
+                        console.log(`Player ${ws.userId} added to waitlist.`);
                         waitingPlayer = ws;
                         sendMessage(ws, { type: 'status', payload: { message: 'Waiting for opponent... ' } });
                     }
                     break;
 
                 case 'create_private_match':
+                    // Check if the player is authenticated - required for matchmaking
+                    if (!ws.userId) {
+                        console.log("Unauthenticated player tried to create a private match");
+                        sendMessage(ws, { 
+                            type: 'error', 
+                            payload: { message: 'You must be logged in to play matches.' }
+                        });
+                        break;
+                    }
+                    
                     const newRoomCode = generateRoomCode();
-                    privateRooms.set(newRoomCode, { creatorWs: ws, roomId: null });
-                    console.log(`Created private room with code ${newRoomCode} for player`);
+                    privateRooms.set(newRoomCode, { 
+                        creatorWs: ws, 
+                        creatorId: ws.userId, // Store the creator's user ID 
+                        roomId: null
+                    });
+                    console.log(`Created private room with code ${newRoomCode} for player ${ws.userId}`);
                     sendMessage(ws, { type: 'private_match_created', payload: { roomCode: newRoomCode } });
                     break;
 
                 case 'join_private_match':
+                    // Check if the player is authenticated - required for matchmaking
+                    if (!ws.userId) {
+                        console.log("Unauthenticated player tried to join a private match");
+                        sendMessage(ws, { 
+                            type: 'error', 
+                            payload: { message: 'You must be logged in to play matches.' }
+                        });
+                        break;
+                    }
+                    
                     const roomCodeToJoin = data.payload.roomCode;
                     if (privateRooms.has(roomCodeToJoin)) {
                         const privateRoom = privateRooms.get(roomCodeToJoin);
-                        if (privateRoom.creatorWs === ws) {
-                             sendMessage(ws, { type: 'error', payload: { message: 'Cannot join your own room' } });
-                             break;
+                        
+                        // Check if player is trying to join their own room
+                        if (privateRoom.creatorWs === ws || privateRoom.creatorId === ws.userId) {
+                            console.log(`Player ${ws.userId} tried to join their own room`);
+                            sendMessage(ws, { 
+                                type: 'error', 
+                                payload: { message: 'Cannot join your own room' }
+                            });
+                            break;
                         }
+                        
                         if (privateRoom.roomId === null) { // Room is waiting
                             const player1 = privateRoom.creatorWs;
                             const player2 = ws;
-                            console.log(`Player joining private room ${roomCodeToJoin}...`);
+                            console.log(`Player ${ws.userId} joining private room ${roomCodeToJoin} created by ${privateRoom.creatorId}...`);
                             const newRoomId = createRoom(player1, player2, 'private');
                             privateRooms.delete(roomCodeToJoin); // Room started, remove from private list
                             console.log(`Private room ${roomCodeToJoin} started as game room ${newRoomId}`);

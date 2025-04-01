@@ -80,6 +80,9 @@ notificationStyle.textContent = `
   .scramble-received {
     background-color: #FF9800; /* Orange for receiving scramble */
   }
+  .error-notification {
+    background-color: #FF0000; /* Red for error */
+  }
 `;
 document.head.appendChild(notificationStyle);
 
@@ -283,7 +286,6 @@ function handleServerMessage(message) {
         updateStatus(`Opponent found! Player ${playerNumber}. Starting...`);
         // Reset search state when match is found
         searchingForMatch = false;
-        localStorage.removeItem('tetris_matchmaking_state'); // Clear matchmaking state
         // TODO: Implement countdown?
         showGameArea(); // Show the main game UI
         initOpponentBoard(); // Initialize opponent display
@@ -353,65 +355,59 @@ function handleServerMessage(message) {
 
     case "error":
       console.error("Server error:", message.payload.message);
-      updateStatus(`Error: ${message.payload.message}`);
+      
+      // Enhanced error handling with visual feedback
+      if (message.payload.message.includes("Cannot play against yourself") || 
+          message.payload.message.includes("Cannot join your own room")) {
+        // Show a more prominent self-match error
+        showNotification(`⚠️ ${message.payload.message}`, "error-notification", 5000);
+        updateStatus(message.payload.message);
+      } else if (message.payload.message.includes("must be logged in")) {
+        // Auth error - redirect to login page
+        showNotification("Login Required", "error-notification", 3000);
+        updateStatus("You must be logged in to play. Redirecting to login...");
+        
+        // Delay redirect to allow user to read the message
+        setTimeout(() => {
+          window.location.href = "login.html";
+        }, 2000);
+      } else {
+        // Default error handling
+        updateStatus(`Error: ${message.payload.message}`);
+      }
+      
       if (!gameStarted) {
         // If error happens before game start, allow retry
         enableStartScreen();
       }
       break;
 
-    case "status": // General status updates from server
-      updateStatus(message.payload.message);
-      // Keep start screen enabled unless matchmaking is actively in progress
-      // (disableStartScreen is called explicitly when sending match requests)
-      if (!gameStarted && startScreen.style.display !== "none") {
-        // Don't re-enable if we're *already* disabled waiting for match_found
-        const anyButtonDisabled =
-          playPublicButton.disabled ||
-          createPrivateButton.disabled ||
-          joinPrivateButton.disabled;
-        if (!anyButtonDisabled) {
-          enableStartScreen();
-        }
+    case "game_over":
+      // Handled by checkGameOver sending the message
+      break;
+
+    case "speed_up":
+      if (message.payload.type === "sent") {
+        // Show notification for sent speed-up
+        showNotification("Speed-up sent!", "speedup-sent");
+      } else if (message.payload.type === "received") {
+        // Activate speed-up on receive
+        activateSpeedUp(message.payload.duration);
+        showNotification("Speed-up received!", "speedup-received");
       }
       break;
 
-    case "game_over":
-      console.log("Game over message from server");
-      gameOver = true;
-      updateStatus("Game Over!");
-      
-      // Clear matchmaking state when game is over
-      localStorage.removeItem('tetris_matchmaking_state');
-      
-      // Create Return to Menu button
-      createReturnButton();
-      break;
-      
-    case "error":
-      console.error(`Server error: ${message.payload.message}`);
-      updateStatus(`Error: ${message.payload.message}`);
-      
-      // Clear matchmaking state on error
-      localStorage.removeItem('tetris_matchmaking_state');
-      
-      // Re-enable buttons if there was an error during matchmaking
-      if (searchingForMatch) {
-        searchingForMatch = false;
-        enableStartScreen();
+    case "scramble":
+      if (message.payload.type === "sent") {
+        // Show notification for sent scramble
+        showNotification("Scramble sent!", "scramble-sent");
+      } else if (message.payload.type === "received") {
+        // Activate scramble on receive
+        showNotification("Board scrambled!", "scramble-received");
+        
+        // Apply scramble to current player's board directly
+        scrambleCurrentBoard(message.payload.intensity);
       }
-      break;
-      
-    case "private_match_created":
-      const roomCode = message.payload.roomCode;
-      displayRoomCode(roomCode);
-      
-      // Update matchmaking state with room code
-      const existingState = JSON.parse(localStorage.getItem('tetris_matchmaking_state') || '{}');
-      existingState.roomCode = roomCode;
-      localStorage.setItem('tetris_matchmaking_state', JSON.stringify(existingState));
-      
-      updateStatus("Waiting for opponent to join...");
       break;
 
     case "opponent_game_over":
@@ -484,27 +480,19 @@ function handleServerMessage(message) {
       }
       break;
 
-    case "speed_up":
-      if (message.payload.type === "sent") {
-        // Show notification for sent speed-up
-        showNotification("Speed-up sent!", "speedup-sent");
-      } else if (message.payload.type === "received") {
-        // Activate speed-up on receive
-        activateSpeedUp(message.payload.duration);
-        showNotification("Speed-up received!", "speedup-received");
-      }
-      break;
-
-    case "scramble":
-      if (message.payload.type === "sent") {
-        // Show notification for sent scramble
-        showNotification("Scramble sent!", "scramble-sent");
-      } else if (message.payload.type === "received") {
-        // Activate scramble on receive
-        showNotification("Board scrambled!", "scramble-received");
-        
-        // Apply scramble to current player's board directly
-        scrambleCurrentBoard(message.payload.intensity);
+    case "status": // General status updates from server
+      updateStatus(message.payload.message);
+      // Keep start screen enabled unless matchmaking is actively in progress
+      // (disableStartScreen is called explicitly when sending match requests)
+      if (!gameStarted && startScreen.style.display !== "none") {
+        // Don't re-enable if we're *already* disabled waiting for match_found
+        const anyButtonDisabled =
+          playPublicButton.disabled ||
+          createPrivateButton.disabled ||
+          joinPrivateButton.disabled;
+        if (!anyButtonDisabled) {
+          enableStartScreen();
+        }
       }
       break;
 
@@ -1121,7 +1109,7 @@ function updateScoreDisplay() {
 }
 
 // Show a notification message
-function showNotification(message, type) {
+function showNotification(message, type, duration = 3000) {
   const notification = document.createElement("div");
   notification.className = `game-notification ${type}`;
   notification.textContent = message;
@@ -1130,7 +1118,7 @@ function showNotification(message, type) {
   // Remove notification after animation completes
   setTimeout(() => {
     notification.remove();
-  }, SPEEDUP_NOTIFICATION_DURATION);
+  }, duration);
 }
 
 // --- Game Loop ---
@@ -1331,14 +1319,6 @@ function handlePlayPublic() {
     return;
   }
   
-  // Save matchmaking state to localStorage
-  const matchmakingState = {
-    active: true,
-    mode: 'public',
-    timestamp: Date.now()
-  };
-  localStorage.setItem('tetris_matchmaking_state', JSON.stringify(matchmakingState));
-  
   // Immediately disable the button to prevent multiple clicks
   playPublicButton.disabled = true;
   playPublicButton.style.opacity = "0.5";
@@ -1365,8 +1345,6 @@ function handlePlayPublic() {
       updateStatus("Connection failed. Try again.");
       searchingForMatch = false; // Reset search state
       enableStartScreen();
-      // Clear matchmaking state if connection fails
-      localStorage.removeItem('tetris_matchmaking_state');
     }
   }, 500);
 }
@@ -1377,15 +1355,6 @@ function handleCreatePrivate() {
     updateStatus("Connecting... Click Create Private again once connected.");
     return;
   }
-  
-  // Save matchmaking state to localStorage
-  const matchmakingState = {
-    active: true,
-    mode: 'private_create',
-    timestamp: Date.now()
-  };
-  localStorage.setItem('tetris_matchmaking_state', JSON.stringify(matchmakingState));
-
   console.log("Requesting private match creation...");
   sendMessageToServer("create_private_match");
   updateStatus("Creating private match...");
@@ -1406,15 +1375,6 @@ function handleJoinPrivate() {
     return;
   }
 
-  // Save matchmaking state to localStorage
-  const matchmakingState = {
-    active: true,
-    mode: 'private_join',
-    roomCode: roomCode,
-    timestamp: Date.now()
-  };
-  localStorage.setItem('tetris_matchmaking_state', JSON.stringify(matchmakingState));
-
   console.log(`Attempting to join private match with code: ${roomCode}...`);
   sendMessageToServer("join_private_match", { roomCode });
   updateStatus(`Joining room ${roomCode}...`);
@@ -1424,50 +1384,7 @@ function handleJoinPrivate() {
 // Initial setup when the script loads
 document.addEventListener("DOMContentLoaded", () => {
   console.log("DOM Loaded. Setting up start screen.");
-  
-  // Check if the user was in matchmaking before navigating away
-  const matchmakingState = localStorage.getItem('tetris_matchmaking_state');
-  if (matchmakingState) {
-    try {
-      const state = JSON.parse(matchmakingState);
-      if (state.active && state.timestamp && (Date.now() - state.timestamp < 5 * 60 * 1000)) {
-        // If matchmaking was active within the last 5 minutes, disable buttons
-        console.log("Restoring matchmaking state, buttons will be disabled");
-        disableStartScreen("Resuming matchmaking...");
-        searchingForMatch = true;
-        
-        // Apply additional styling to the public match button if that was the active mode
-        if (state.mode === 'public') {
-          playPublicButton.style.opacity = "0.5";
-          playPublicButton.style.cursor = "not-allowed";
-        }
-        
-        // Auto-reconnect WebSocket and resume matchmaking
-        setTimeout(() => {
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            if (state.mode === 'public') {
-              sendMessageToServer("find_public_match");
-              updateStatus("Finding opponent...");
-            } else if (state.mode === 'private' && state.roomCode) {
-              privateRoomInfo.textContent = `Room Code: ${state.roomCode}`;
-              privateRoomInfo.style.display = "block";
-            }
-          }
-        }, 1000);
-      } else {
-        // If state is old or invalid, clear it
-        localStorage.removeItem('tetris_matchmaking_state');
-        showStartScreen();
-      }
-    } catch (e) {
-      console.error("Error parsing matchmaking state:", e);
-      localStorage.removeItem('tetris_matchmaking_state');
-      showStartScreen();
-    }
-  } else {
-    showStartScreen();
-  }
-  
+  showStartScreen();
   // New button listeners
   playPublicButton.addEventListener("click", handlePlayPublic);
   createPrivateButton.addEventListener("click", handleCreatePrivate);
@@ -1823,7 +1740,7 @@ function forceButtonCreation() {
     color: 'white',
     fontSize: '24px',
     padding: '20px 40px',
-    border: 'none',
+    border: '3px solid white',
     borderRadius: '8px',
     cursor: 'pointer'
   });
