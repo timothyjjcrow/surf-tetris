@@ -1263,6 +1263,12 @@ function gameLoop(timestamp = 0) {
     lastTime = timestamp;
   }
 
+  // Add a check to ensure pieces lock even during speed-up
+  // This ensures that if a piece has been touching ground for too long, it will lock
+  if (isTouchingGround() && !lockDelayTimer) {
+    startLockDelay();
+  }
+
   // Draw everything
   if (renderer) {
     renderer.drawBoard(board);
@@ -1292,386 +1298,25 @@ function gameLoop(timestamp = 0) {
   animationFrameId = requestAnimationFrame(gameLoop);
 }
 
-// --- Input Handling ---
-const keyMap = {
-  ArrowLeft: () => movePiece(-1, 0),
-  ArrowRight: () => movePiece(1, 0),
-  ArrowDown: softDrop,
-  ArrowUp: rotatePiece, // Rotate
-  " ": hardDrop, // Space bar
-  c: holdCurrentPiece, // Change from KeyC to c
-  C: holdCurrentPiece, // Also add uppercase C for caps lock
-  KeyC: holdCurrentPiece, // Keep original for compatibility
-};
+// Modify startLockDelay to ensure consistent behavior during speed-up
+function startLockDelay() {
+  if (lockDelayTimer) {
+    clearTimeout(lockDelayTimer); // Clear any existing timer first
+  }
+  
+  // Check immediately if it should lock (prevents delay if already grounded for a while)
+  if (!isTouchingGround()) return; // Only start if touching
 
-// Game actions for mobile controls
-const gameActions = {
-  moveLeft: () => movePiece(-1, 0),
-  moveRight: () => movePiece(1, 0),
-  softDrop: softDrop,
-  hardDrop: hardDrop,
-  rotate: rotatePiece,
-  hold: holdCurrentPiece,
-  startMovement: startMovement,
-  stopMovement: stopMovement
-};
+  // Use a shorter lock delay during speed-up to prevent pieces from sliding too much
+  const actualLockDelay = isSpeedUpActive ? Math.min(LOCK_DELAY, 300) : LOCK_DELAY;
 
-document.addEventListener("keydown", (event) => {
-  // Ignore input if game not active
-  if (gameOver || gameWon || !gameStarted) return;
-
-  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-    if (!moveKeyDown) {
-      // Only start movement if not already moving
-      startMovement(event.key);
+  lockDelayTimer = setTimeout(() => {
+    if (isTouchingGround()) {
+      // Double-check if still touching when timer expires
+      lockPiece();
     }
-  } else if (keyMap[event.code] || keyMap[event.key]) {
-    event.preventDefault(); // Prevent default browser actions (like space scrolling)
-    // Try both event.code (for KeyC) and event.key (for "c" or "C")
-    const handler = keyMap[event.code] || keyMap[event.key];
-    if (handler) handler();
-  }
-});
-
-document.addEventListener("keyup", (event) => {
-  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-    if (moveKeyDown === event.key) {
-      stopMovement();
-    }
-  }
-});
-// Auto-repeat for left/right movement
-let moveInterval = null;
-let repeatDelay = 150; // ms delay before repeat starts
-let repeatRate = 50; // ms between repeats
-let moveKeyDown = null;
-let repeatTimeout = null;
-
-function stopMovement() {
-  clearInterval(moveInterval);
-  clearTimeout(repeatTimeout);
-  moveInterval = null;
-  repeatTimeout = null;
-  moveKeyDown = null;
-}
-
-function startMovement(key) {
-  if (moveKeyDown === key) return; // Already moving this way
-  stopMovement(); // Stop any previous movement
-  moveKeyDown = key;
-
-  // Initial move
-  if (keyMap[key]) keyMap[key]();
-
-  // Start repeat timer
-  repeatTimeout = setTimeout(() => {
-    if (keyMap[key]) {
-      moveInterval = setInterval(() => {
-        keyMap[key]();
-      }, repeatRate);
-    }
-  }, repeatDelay);
-}
-
-// --- Start Screen Flow ---
-function showStartScreen() {
-  startScreen.style.display = "flex"; // Use flex as set in CSS
-  gameAreaElement.style.display = "none";
-  privateRoomInfo.style.display = "none"; // Hide room code info
-  roomCodeInput.value = ""; // Clear input
-  enableStartScreen(); // Ensure buttons are enabled
-}
-
-function hideStartScreen() {
-  startScreen.style.display = "none";
-}
-
-function showGameArea() {
-  // Hide start screen and show game area
-  hideStartScreen();
-  gameAreaElement.style.display = "flex";
-  
-  // Show mobile controls when game area is visible
-  if (mobileControls) {
-    mobileControls.show();
-  }
-}
-
-// Disable buttons/input during connection/matchmaking attempts
-function disableStartScreen(reason = "") {
-  if (reason) {
-    updateStatus(reason);
-  }
-  
-  // Don't hide the screen, just disable the buttons
-  playPublicButton.disabled = true;
-  createPrivateButton.disabled = true;
-  joinPrivateButton.disabled = true;
-  roomCodeInput.disabled = true;
-}
-
-function enableStartScreen() {
-  startScreen.style.display = "block";
-  
-  // Re-enable all buttons
-  playPublicButton.disabled = false;
-  createPrivateButton.disabled = false;
-  joinPrivateButton.disabled = false;
-  roomCodeInput.disabled = false;
-  
-  // Reset button styling
-  playPublicButton.style.opacity = "1";
-  playPublicButton.style.cursor = "pointer";
-  
-  searchingForMatch = false; // Reset search state when enabling start screen
-}
-
-// Display the generated room code
-function displayRoomCode(code) {
-  privateRoomInfo.textContent = `Room Code: ${code}`;
-  privateRoomInfo.style.display = "block";
-}
-
-// --- New Button Handlers ---
-function handlePlayPublic() {
-  // Prevent multiple requests if already searching
-  if (searchingForMatch) {
-    console.log("Already searching for a match");
-    return;
-  }
-  
-  // Immediately disable the button to prevent multiple clicks
-  playPublicButton.disabled = true;
-  playPublicButton.style.opacity = "0.5";
-  playPublicButton.style.cursor = "not-allowed";
-  
-  searchingForMatch = true;
-  updateStatus("Connecting to server...");
-  disableStartScreen();
-  
-  // Connect to server and request public match
-  connectWebSocket();
-  
-  // Wait for connection to establish before sending match request
-  setTimeout(() => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      sendMessageToServer("find_public_match");
-      updateStatus("Finding opponent...");
-      showMatchmakingState(true);
-    } else {
-      updateStatus("Connection failed. Try again.");
-      searchingForMatch = false; // Reset search state
-      enableStartScreen();
-    }
-  }, 500);
-}
-
-function handleCreatePrivate() {
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    connectWebSocket();
-    updateStatus("Connecting... Click Create Private again once connected.");
-    return;
-  }
-  console.log("Requesting private match creation...");
-  sendMessageToServer("create_private_match");
-  updateStatus("Creating private match...");
-  showMatchmakingState(true);
-  disableStartScreen();
-}
-
-function handleJoinPrivate() {
-  const roomCode = roomCodeInput.value.trim().toUpperCase();
-  if (roomCode.length !== 4) {
-    // Basic validation
-    updateStatus("Invalid room code (must be 4 characters).");
-    return;
-  }
-
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    connectWebSocket();
-    updateStatus("Connecting... Click Join Private again once connected.");
-    return;
-  }
-
-  console.log(`Attempting to join private match with code: ${roomCode}...`);
-  sendMessageToServer("join_private_match", { roomCode });
-  updateStatus(`Joining room ${roomCode}...`);
-  showMatchmakingState(true);
-  disableStartScreen();
-}
-
-// Initial setup when the script loads
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("DOM Loaded. Setting up start screen.");
-  showStartScreen();
-  // New button listeners
-  playPublicButton.addEventListener("click", handlePlayPublic);
-  createPrivateButton.addEventListener("click", handleCreatePrivate);
-  joinPrivateButton.addEventListener("click", handleJoinPrivate);
-
-  // Automatically try to connect WebSocket on load for convenience
-  connectWebSocket();
-});
-
-// --- Game Over Check ---
-function checkGameOver() {
-  // Check if any part of the spawn location already has blocks
-  if (currentPiece) {
-    const shape = currentPiece.shape;
-    for (let r = 0; r < shape.length; r++) {
-      for (let c = 0; c < shape[r].length; c++) {
-        if (shape[r][c]) {
-          const boardRow = currentY + r;
-          const boardCol = currentX + c;
-          // If a block is in the hidden rows, we'll assume it's a valid move
-          // But if the board already has a block there in the visible area, it's game over
-          if (
-            boardRow >= 0 && // Only checking visible rows
-            boardRow < TOTAL_ROWS &&
-            boardCol >= 0 &&
-            boardCol < COLS &&
-            board[boardRow][boardCol] !== 0
-          ) {
-            console.log("Game over condition detected!");
-            gameOver = true;
-            updateStatus("Game Over!");
-            
-            // Get user ID from localStorage
-            const userId = localStorage.getItem('tetris_user_id');
-            
-            // Always send the user ID with the game over message
-            if (userId) {
-              sendMessageToServer("game_over", { 
-                score,
-                linesCleared,
-                userId
-              });
-              console.log("Sent game_over message to server with score:", score, "lines:", linesCleared, "userId:", userId);
-            } else {
-              // Still try to send even without user ID, but log the issue
-              sendMessageToServer("game_over", { 
-                score, 
-                linesCleared,
-                // Send an empty user ID indicator to help with debugging
-                noUserId: true
-              });
-              console.log("WARNING: Sent game_over message without user ID. Authentication may be missing!");
-            }
-            
-            playerLost = true;
-            showReturnToMenuButton();
-            if (animationFrameId) {
-              cancelAnimationFrame(animationFrameId);
-              animationFrameId = null;
-            }
-            return true;
-          }
-        }
-      }
-    }
-  }
-  return false;
-}
-
-// Direct DOM insertion of Return to Menu button - more reliable approach
-function insertReturnToMenuButton() {
-  console.log("FORCEFULLY inserting Return to Menu button");
-  
-  // Remove any existing button first
-  const existingButton = document.getElementById('returnToMenuBtn');
-  if (existingButton) {
-    existingButton.remove();
-  }
-  
-  // Create button with inline styles for maximum reliability
-  const menuBtn = document.createElement('button');
-  menuBtn.id = 'returnToMenuBtn';
-  menuBtn.innerText = 'Return to Menu';
-  
-  // Apply styles directly to the element
-  Object.assign(menuBtn.style, {
-    position: 'fixed',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    padding: '15px 30px',
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    fontSize: '18px',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    zIndex: '9999',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
-  });
-  
-  // Mobile-specific styles
-  if (window.innerWidth <= 767) {
-    Object.assign(menuBtn.style, {
-      padding: '20px 40px',
-      fontSize: '22px'
-    });
-  }
-  
-  // Add event listener
-  menuBtn.addEventListener('click', function() {
-    window.location.href = '/';
-  });
-  
-  // Add to document body directly (most reliable)
-  document.body.appendChild(menuBtn);
-  
-  console.log("Return to Menu button forcefully added");
-  
-  // Try to move it to the front
-  document.body.appendChild(menuBtn);
-}
-
-// Call the original function as a fallback
-function showReturnToMenuButton() {
-  // Check if button already exists
-  if (document.getElementById('returnToMenuBtn')) return;
-  
-  console.log("Creating Return to Menu button (original method)");
-  insertReturnToMenuButton();
-}
-
-// Function to send score updates to the server
-function sendScoreUpdate() {
-  if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
-    // Get the user ID from localStorage
-    const userId = localStorage.getItem('tetris_user_id');
-    
-    sendMessageToServer("update_score", {
-      score: score,
-      lines: linesCleared,
-      userId: userId // Send user ID with each score update
-    });
-    
-    console.log(`Score update sent: Score=${score}, Lines=${linesCleared}, UserID=${userId || 'not logged in'}`);
-  }
-}
-
-// Send periodic score updates (every 10 seconds)
-function startPeriodicScoreUpdates() {
-  if (scoreUpdateInterval) clearInterval(scoreUpdateInterval);
-  
-  scoreUpdateInterval = setInterval(() => {
-    if (gameStarted && !gameOver && !gameWon) {
-      sendScoreUpdate();
-    } else {
-      clearInterval(scoreUpdateInterval);
-      scoreUpdateInterval = null;
-    }
-  }, 10000); // Send score update every 10 seconds
-}
-
-// Initialize score update interval
-let scoreUpdateInterval = null;
-
-function getLinePoints(lines) {
-  const points = [0, 100, 300, 500, 800];
-  return points[lines];
+    lockDelayTimer = null;
+  }, actualLockDelay);
 }
 
 // Activate speed-up attack
@@ -1679,7 +1324,6 @@ function activateSpeedUp(duration) {
   if (isSpeedUpActive) return; // Don't activate if already active
   
   isSpeedUpActive = true;
-  
   // Store original drop interval
   const originalDropInterval = dropInterval;
   baseDropInterval = dropInterval;
@@ -2092,4 +1736,386 @@ function forceButtonCreation() {
   
   // Try to move it to the front
   document.body.appendChild(btn);
+}
+
+// --- Input Handling ---
+const keyMap = {
+  ArrowLeft: () => movePiece(-1, 0),
+  ArrowRight: () => movePiece(1, 0),
+  ArrowDown: softDrop,
+  ArrowUp: rotatePiece, // Rotate
+  " ": hardDrop, // Space bar
+  c: holdCurrentPiece, // Change from KeyC to c
+  C: holdCurrentPiece, // Also add uppercase C for caps lock
+  KeyC: holdCurrentPiece, // Keep original for compatibility
+};
+
+// Game actions for mobile controls
+const gameActions = {
+  moveLeft: () => movePiece(-1, 0),
+  moveRight: () => movePiece(1, 0),
+  softDrop: softDrop,
+  hardDrop: hardDrop,
+  rotate: rotatePiece,
+  hold: holdCurrentPiece,
+  startMovement: startMovement,
+  stopMovement: stopMovement
+};
+
+document.addEventListener("keydown", (event) => {
+  // Ignore input if game not active
+  if (gameOver || gameWon || !gameStarted) return;
+
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    if (!moveKeyDown) {
+      // Only start movement if not already moving
+      startMovement(event.key);
+    }
+  } else if (keyMap[event.code] || keyMap[event.key]) {
+    event.preventDefault(); // Prevent default browser actions (like space scrolling)
+    // Try both event.code (for KeyC) and event.key (for "c" or "C")
+    const handler = keyMap[event.code] || keyMap[event.key];
+    if (handler) handler();
+  }
+});
+
+document.addEventListener("keyup", (event) => {
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    if (moveKeyDown === event.key) {
+      stopMovement();
+    }
+  }
+});
+// Auto-repeat for left/right movement
+let moveInterval = null;
+let repeatDelay = 150; // ms delay before repeat starts
+let repeatRate = 50; // ms between repeats
+let moveKeyDown = null;
+let repeatTimeout = null;
+
+function stopMovement() {
+  clearInterval(moveInterval);
+  clearTimeout(repeatTimeout);
+  moveInterval = null;
+  repeatTimeout = null;
+  moveKeyDown = null;
+}
+
+function startMovement(key) {
+  if (moveKeyDown === key) return; // Already moving this way
+  stopMovement(); // Stop any previous movement
+  moveKeyDown = key;
+
+  // Initial move
+  if (keyMap[key]) keyMap[key]();
+
+  // Start repeat timer
+  repeatTimeout = setTimeout(() => {
+    if (keyMap[key]) {
+      moveInterval = setInterval(() => {
+        keyMap[key]();
+      }, repeatRate);
+    }
+  }, repeatDelay);
+}
+
+// --- Start Screen Flow ---
+function showStartScreen() {
+  startScreen.style.display = "flex"; // Use flex as set in CSS
+  gameAreaElement.style.display = "none";
+  privateRoomInfo.style.display = "none"; // Hide room code info
+  roomCodeInput.value = ""; // Clear input
+  enableStartScreen(); // Ensure buttons are enabled
+}
+
+function hideStartScreen() {
+  startScreen.style.display = "none";
+}
+
+function showGameArea() {
+  // Hide start screen and show game area
+  hideStartScreen();
+  gameAreaElement.style.display = "flex";
+  
+  // Show mobile controls when game area is visible
+  if (mobileControls) {
+    mobileControls.show();
+  }
+}
+
+// Disable buttons/input during connection/matchmaking attempts
+function disableStartScreen(reason = "") {
+  if (reason) {
+    updateStatus(reason);
+  }
+  
+  // Don't hide the screen, just disable the buttons
+  playPublicButton.disabled = true;
+  createPrivateButton.disabled = true;
+  joinPrivateButton.disabled = true;
+  roomCodeInput.disabled = true;
+}
+
+function enableStartScreen() {
+  startScreen.style.display = "block";
+  
+  // Re-enable all buttons
+  playPublicButton.disabled = false;
+  createPrivateButton.disabled = false;
+  joinPrivateButton.disabled = false;
+  roomCodeInput.disabled = false;
+  
+  // Reset button styling
+  playPublicButton.style.opacity = "1";
+  playPublicButton.style.cursor = "pointer";
+  
+  searchingForMatch = false; // Reset search state when enabling start screen
+}
+
+// Display the generated room code
+function displayRoomCode(code) {
+  privateRoomInfo.textContent = `Room Code: ${code}`;
+  privateRoomInfo.style.display = "block";
+}
+
+// --- New Button Handlers ---
+function handlePlayPublic() {
+  // Prevent multiple requests if already searching
+  if (searchingForMatch) {
+    console.log("Already searching for a match");
+    return;
+  }
+  
+  // Immediately disable the button to prevent multiple clicks
+  playPublicButton.disabled = true;
+  playPublicButton.style.opacity = "0.5";
+  playPublicButton.style.cursor = "not-allowed";
+  
+  searchingForMatch = true;
+  updateStatus("Connecting to server...");
+  disableStartScreen();
+  
+  // Connect to server and request public match
+  connectWebSocket();
+  
+  // Wait for connection to establish before sending match request
+  setTimeout(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      sendMessageToServer("find_public_match");
+      updateStatus("Finding opponent...");
+      showMatchmakingState(true);
+    } else {
+      updateStatus("Connection failed. Try again.");
+      searchingForMatch = false; // Reset search state
+      enableStartScreen();
+    }
+  }, 500);
+}
+
+function handleCreatePrivate() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    connectWebSocket();
+    updateStatus("Connecting... Click Create Private again once connected.");
+    return;
+  }
+  console.log("Requesting private match creation...");
+  sendMessageToServer("create_private_match");
+  updateStatus("Creating private match...");
+  showMatchmakingState(true);
+  disableStartScreen();
+}
+
+function handleJoinPrivate() {
+  const roomCode = roomCodeInput.value.trim().toUpperCase();
+  if (roomCode.length !== 4) {
+    // Basic validation
+    updateStatus("Invalid room code (must be 4 characters).");
+    return;
+  }
+
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    connectWebSocket();
+    updateStatus("Connecting... Click Join Private again once connected.");
+    return;
+  }
+
+  console.log(`Attempting to join private match with code: ${roomCode}...`);
+  sendMessageToServer("join_private_match", { roomCode });
+  updateStatus(`Joining room ${roomCode}...`);
+  showMatchmakingState(true);
+  disableStartScreen();
+}
+
+// Initial setup when the script loads
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM Loaded. Setting up start screen.");
+  showStartScreen();
+  // New button listeners
+  playPublicButton.addEventListener("click", handlePlayPublic);
+  createPrivateButton.addEventListener("click", handleCreatePrivate);
+  joinPrivateButton.addEventListener("click", handleJoinPrivate);
+
+  // Automatically try to connect WebSocket on load for convenience
+  connectWebSocket();
+});
+
+// --- Game Over Check ---
+function checkGameOver() {
+  // Check if any part of the spawn location already has blocks
+  if (currentPiece) {
+    const shape = currentPiece.shape;
+    for (let r = 0; r < shape.length; r++) {
+      for (let c = 0; c < shape[r].length; c++) {
+        if (shape[r][c]) {
+          const boardRow = currentY + r;
+          const boardCol = currentX + c;
+          // If a block is in the hidden rows, we'll assume it's a valid move
+          // But if the board already has a block there in the visible area, it's game over
+          if (
+            boardRow >= 0 && // Only checking visible rows
+            boardRow < TOTAL_ROWS &&
+            boardCol >= 0 &&
+            boardCol < COLS &&
+            board[boardRow][boardCol] !== 0
+          ) {
+            console.log("Game over condition detected!");
+            gameOver = true;
+            updateStatus("Game Over!");
+            
+            // Get user ID from localStorage
+            const userId = localStorage.getItem('tetris_user_id');
+            
+            // Always send the user ID with the game over message
+            if (userId) {
+              sendMessageToServer("game_over", { 
+                score,
+                linesCleared,
+                userId
+              });
+              console.log("Sent game_over message to server with score:", score, "lines:", linesCleared, "userId:", userId);
+            } else {
+              // Still try to send even without user ID, but log the issue
+              sendMessageToServer("game_over", { 
+                score, 
+                linesCleared,
+                // Send an empty user ID indicator to help with debugging
+                noUserId: true
+              });
+              console.log("WARNING: Sent game_over message without user ID. Authentication may be missing!");
+            }
+            
+            playerLost = true;
+            showReturnToMenuButton();
+            if (animationFrameId) {
+              cancelAnimationFrame(animationFrameId);
+              animationFrameId = null;
+            }
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// Direct DOM insertion of Return to Menu button - more reliable approach
+function insertReturnToMenuButton() {
+  console.log("FORCEFULLY inserting Return to Menu button");
+  
+  // Remove any existing button first
+  const existingButton = document.getElementById('returnToMenuBtn');
+  if (existingButton) {
+    existingButton.remove();
+  }
+  
+  // Create button with inline styles for maximum reliability
+  const menuBtn = document.createElement('button');
+  menuBtn.id = 'returnToMenuBtn';
+  menuBtn.innerText = 'Return to Menu';
+  
+  // Apply styles directly to the element
+  Object.assign(menuBtn.style, {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    padding: '15px 30px',
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    fontSize: '18px',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    zIndex: '9999',
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.3)'
+  });
+  
+  // Mobile-specific styles
+  if (window.innerWidth <= 767) {
+    Object.assign(menuBtn.style, {
+      padding: '20px 40px',
+      fontSize: '22px'
+    });
+  }
+  
+  // Add event listener
+  menuBtn.addEventListener('click', function() {
+    window.location.href = '/';
+  });
+  
+  // Add to document body directly (most reliable)
+  document.body.appendChild(menuBtn);
+  
+  console.log("Return to Menu button forcefully added");
+  
+  // Try to move it to the front
+  document.body.appendChild(menuBtn);
+}
+
+// Call the original function as a fallback
+function showReturnToMenuButton() {
+  // Check if button already exists
+  if (document.getElementById('returnToMenuBtn')) return;
+  
+  console.log("Creating Return to Menu button (original method)");
+  insertReturnToMenuButton();
+}
+
+// Function to send score updates to the server
+function sendScoreUpdate() {
+  if (ws && ws.readyState === WebSocket.OPEN && gameStarted) {
+    // Get the user ID from localStorage
+    const userId = localStorage.getItem('tetris_user_id');
+    
+    sendMessageToServer("update_score", {
+      score: score,
+      lines: linesCleared,
+      userId: userId // Send user ID with each score update
+    });
+    
+    console.log(`Score update sent: Score=${score}, Lines=${linesCleared}, UserID=${userId || 'not logged in'}`);
+  }
+}
+
+// Send periodic score updates (every 10 seconds)
+function startPeriodicScoreUpdates() {
+  if (scoreUpdateInterval) clearInterval(scoreUpdateInterval);
+  
+  scoreUpdateInterval = setInterval(() => {
+    if (gameStarted && !gameOver && !gameWon) {
+      sendScoreUpdate();
+    } else {
+      clearInterval(scoreUpdateInterval);
+      scoreUpdateInterval = null;
+    }
+  }, 10000); // Send score update every 10 seconds
+}
+
+// Initialize score update interval
+let scoreUpdateInterval = null;
+
+function getLinePoints(lines) {
+  const points = [0, 100, 300, 500, 800];
+  return points[lines];
 }
