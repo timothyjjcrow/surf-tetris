@@ -378,6 +378,16 @@ wss.on('connection', (ws) => {
                                                         opponent.userId === winnerId ? result.player1EloChange : result.player2EloChange;
                                                     sendMessage(opponent, updateMsg);
                                                 }
+                                                
+                                                // Call additional leaderboard update endpoint to force refresh
+                                                try {
+                                                    // Using internal API call to refresh the leaderboard cache
+                                                    const statsRoutes = require('./routes/statsRoutes');
+                                                    statsRoutes.refreshLeaderboardCache();
+                                                    console.log('Leaderboard cache refreshed');
+                                                } catch (error) {
+                                                    console.error('Error refreshing leaderboard cache:', error);
+                                                }
                                             } else {
                                                 console.error('Failed to record match result:', result.error);
                                             }
@@ -545,8 +555,38 @@ wss.on('connection', (ws) => {
 
     // --- Disconnection Handling ---
     ws.on('close', () => {
-        console.log(`Client disconnected. Room: ${ws.roomId}, Player: ${ws.playerNumber}. Rooms left: ${gameRooms.size}`);
-        cleanupClient(ws);
+        // Get the room this client was in, if any
+        const roomId = ws.roomId;
+        const playerNumber = ws.playerNumber;
+        
+        console.log(`Client disconnected. Room: ${roomId || 'null'}, Player: ${playerNumber || 'null'}. Rooms left: ${gameRooms.size}`);
+        
+        // If this client was in a room, notify the other player and handle cleanup
+        if (roomId) {
+          const room = gameRooms.get(roomId);
+          if (room) {
+            // Get the other player in the room
+            const otherPlayer = (ws === room.player1) ? room.player2 : room.player1;
+            
+            console.log(`Room ${roomId}: Player ${playerNumber} left. Room state updated.`);
+            
+            // Notify the other player if they're still connected
+            if (otherPlayer && otherPlayer.readyState === WebSocket.OPEN) {
+              sendMessage(otherPlayer, {
+                type: "opponent_disconnected",
+                payload: { message: "Your opponent disconnected." }
+              });
+              
+              // Mark the disconnected player as lost
+              ws.lost = true;
+              
+              // Handle room cleanup and match recording
+              handleRoomCleanup(roomId, ws.userId);
+            }
+          }
+        }
+        
+        console.log(`Client disconnected. Player ${playerNumber || 'N/A'}, Room: ${roomId ? roomId : '(no room)'}. Rooms left: ${gameRooms.size}`);
     });
 
     ws.on('error', (error) => {
@@ -695,6 +735,90 @@ function handleAuthentication(ws, payload) {
 
         console.log(`User authenticated: ${username} (ID: ${userId})`);
     });
+}
+
+function handleRoomCleanup(roomId, disconnectedPlayerId = null) {
+  const room = gameRooms.get(roomId);
+  if (!room) return;
+  
+  // Get players in the room
+  const players = Array.from(wss.clients)
+    .filter(client => client.roomId === roomId);
+  
+  console.log(`Room cleanup for ${roomId}. Players still connected: ${players.length}. Disconnected player ID: ${disconnectedPlayerId || 'none'}`);
+  
+  // If we have two players with user IDs, record the match result
+  if (players.length <= 1 && room.player1 && room.player2) {
+    let player1Client = room.player1;
+    let player2Client = room.player2;
+    
+    // Find the player who lost (either the disconnected one or the one who sent game_over)
+    const player1Lost = player1Client.lost || (disconnectedPlayerId && player1Client.userId == disconnectedPlayerId);
+    const player2Lost = player2Client.lost || (disconnectedPlayerId && player2Client.userId == disconnectedPlayerId);
+    
+    console.log(`Recording match on room cleanup: Player1(${player1Client.userId}) lost=${player1Lost}, Player2(${player2Client.userId}) lost=${player2Lost}`);
+    
+    if (player1Client.userId && player2Client.userId && (player1Lost || player2Lost)) {
+      // Determine winner based on who didn't lose
+      let winnerId, loserId;
+      
+      if (player1Lost && player2Lost) {
+        // If both lost, use score as tiebreaker
+        winnerId = (player1Client.lastScore || 0) > (player2Client.lastScore || 0) ? player1Client.userId : player2Client.userId;
+      } else {
+        winnerId = player1Lost ? player2Client.userId : player1Client.userId;
+      }
+      loserId = winnerId === player1Client.userId ? player2Client.userId : player1Client.userId;
+      
+      console.log(`Recording match in cleanup: Winner=${winnerId}, Loser=${loserId}`);
+      
+      // Match data with scores
+      const matchData = {
+        winnerScore: winnerId === player1Client.userId ? (player1Client.lastScore || 0) : (player2Client.lastScore || 0),
+        loserScore: loserId === player1Client.userId ? (player1Client.lastScore || 0) : (player2Client.lastScore || 0),
+        winnerLines: winnerId === player1Client.userId ? (player1Client.lastLines || 0) : (player2Client.lastLines || 0),
+        loserLines: loserId === player1Client.userId ? (player1Client.lastLines || 0) : (player2Client.lastLines || 0)
+      };
+      
+      // Record the match result
+      const gameStatsModel = require('./models/gameStatsModel');
+      gameStatsModel.recordMatchResult(player1Client.userId, player2Client.userId, winnerId, matchData)
+        .then(result => {
+          if (result.success) {
+            console.log(`Match result recorded on room cleanup: ${winnerId} won against ${loserId}`);
+            console.log('ELO changes:', {
+              player1EloChange: result.player1EloChange || 0,
+              player2EloChange: result.player2EloChange || 0
+            });
+            
+            // Notify any remaining connected players
+            players.forEach(player => {
+              if (player.readyState === WebSocket.OPEN) {
+                const eloChange = player.userId === winnerId ? result.player1EloChange : result.player2EloChange;
+                sendMessage(player, {
+                  type: 'stats_updated',
+                  payload: {
+                    message: 'Your stats have been updated!',
+                    eloChange
+                  }
+                });
+              }
+            });
+          } else {
+            console.error('Failed to record match result on cleanup:', result.error);
+          }
+        })
+        .catch(err => {
+          console.error('Error recording match result on cleanup:', err);
+        });
+    }
+  }
+  
+  // Clean up room if empty or just has dummy connections
+  if (players.length === 0) {
+    console.log(`Removing empty room ${roomId}`);
+    gameRooms.delete(roomId);
+  }
 }
 
 // Initialize database

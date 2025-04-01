@@ -6,6 +6,35 @@ const db = require('../dbConfig'); // Correct import for database connection
 
 const router = express.Router();
 
+// In-memory cache for leaderboard data
+let leaderboardCache = null;
+let leaderboardCacheTime = 0;
+
+// Helper function to refresh the leaderboard cache
+// This can be called directly from other server components
+const refreshLeaderboardCache = async () => {
+  try {
+    console.log('Manually refreshing leaderboard cache');
+    const result = await gameStatsModel.getLeaderboard(50, 0); // Get top 50 players
+    
+    if (result.success) {
+      leaderboardCache = result.leaderboard;
+      leaderboardCacheTime = Date.now();
+      console.log(`Leaderboard cache refreshed with ${leaderboardCache.length} entries`);
+      return true;
+    } else {
+      console.error('Failed to refresh leaderboard cache:', result.error);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error refreshing leaderboard cache:', error);
+    return false;
+  }
+};
+
+// Export the refreshLeaderboardCache function for server use
+router.refreshLeaderboardCache = refreshLeaderboardCache;
+
 // Get leaderboard
 router.get('/leaderboard', async (req, res) => {
   try {
