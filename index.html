@@ -157,6 +157,16 @@
 
     <div id="status">Loading...</div> <!-- Status Indicator -->
 
+    <!-- Match found dialog - will be shown when a match is found -->
+    <div id="matchFoundDialog" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; border: 3px solid #4CAF50; border-radius: 10px; padding: 20px; text-align: center; box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 1000; max-width: 80%;">
+        <h2 style="color: #4CAF50; margin-top: 0;">Match Found!</h2>
+        <p id="matchFoundMessage">An opponent has been found for your game.</p>
+        <div style="margin-top: 20px;">
+            <button id="acceptMatchButton" style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; margin-right: 10px; cursor: pointer;">Accept</button>
+            <button id="declineMatchButton" style="background-color: #f44336; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Decline</button>
+        </div>
+    </div>
+
     <div id="startScreen" style="text-align: center; margin-top: 10px;">
         <!-- Navigation links to new features -->
         <div class="nav-links" style="display: flex; justify-content: center; margin-bottom: 20px;">

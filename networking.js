@@ -66,6 +66,14 @@ export class NetworkManager {
     this.sendMessageToServer("find_public_match");
   }
 
+  acceptMatch() {
+    this.sendMessageToServer("accept_match");
+  }
+
+  declineMatch() {
+    this.sendMessageToServer("decline_match");
+  }
+
   createPrivateMatch() {
     this.sendMessageToServer("create_private_match");
   }

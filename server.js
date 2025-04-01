@@ -79,6 +79,8 @@ let gameRooms = new Map(); // roomId -> { id: string, player1: ws, player2: ws, 
 let waitingPlayer = null;   // Holds the WebSocket of the player waiting for a public match
 let privateRooms = new Map(); // roomCode -> { creatorWs: ws, creatorId: string, roomId: string | null } (roomId is null until joined)
 let roomIdCounter = 1;
+// Track player acceptance for matches
+let pendingMatches = new Map(); // roomId -> { player1Accepted: boolean, player2Accepted: boolean, player1: ws, player2: ws }
 
 // Track authenticated users
 let authenticatedUsers = new Map(); // userId -> { ws: WebSocket, username: string, eloRating: number }
@@ -181,7 +183,18 @@ wss.on('connection', (ws) => {
                             const player1 = waitingPlayer;
                             const player2 = ws;
                             waitingPlayer = null; // Clear waitingPlayer reference
-                            createRoom(player1, player2, 'public');
+                            
+                            // Create a new room but don't start the game yet - wait for both players to accept
+                            const roomId = createRoom(player1, player2, 'public', false);
+                            
+                            // Add this match to the pending matches, waiting for acceptances
+                            pendingMatches.set(roomId, {
+                                player1Accepted: false,
+                                player2Accepted: false,
+                                player1,
+                                player2
+                            });
+                            
                             break;
                         }
                     }
@@ -196,6 +209,71 @@ wss.on('connection', (ws) => {
                             matchmaking: true 
                         }
                     });
+                    break;
+
+                case 'accept_match':
+                    // Handle match acceptance
+                    if (ws.roomId) {
+                        const roomId = ws.roomId;
+                        const pendingMatch = pendingMatches.get(roomId);
+                        
+                        if (pendingMatch) {
+                            // Mark this player as accepted
+                            if (ws === pendingMatch.player1) {
+                                pendingMatch.player1Accepted = true;
+                                console.log(`Player 1 (${ws.userId}) accepted match in room ${roomId}`);
+                            } else if (ws === pendingMatch.player2) {
+                                pendingMatch.player2Accepted = true;
+                                console.log(`Player 2 (${ws.userId}) accepted match in room ${roomId}`);
+                            }
+                            
+                            // Check if both players have accepted
+                            if (pendingMatch.player1Accepted && pendingMatch.player2Accepted) {
+                                console.log(`Both players accepted match in room ${roomId}, starting game`);
+                                
+                                // Send match accepted message to both players to start the game
+                                sendMessage(pendingMatch.player1, {
+                                    type: 'match_accepted',
+                                    payload: {}
+                                });
+                                
+                                sendMessage(pendingMatch.player2, {
+                                    type: 'match_accepted',
+                                    payload: {}
+                                });
+                                
+                                // Remove from pending matches since it's now active
+                                pendingMatches.delete(roomId);
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 'decline_match':
+                    // Handle match declination
+                    if (ws.roomId) {
+                        const roomId = ws.roomId;
+                        const pendingMatch = pendingMatches.get(roomId);
+                        
+                        if (pendingMatch) {
+                            // Get the opponent who will be notified
+                            const opponent = (ws === pendingMatch.player1) ? pendingMatch.player2 : pendingMatch.player1;
+                            
+                            console.log(`Player ${ws.userId} declined match in room ${roomId}`);
+                            
+                            // Notify the opponent that the match was declined
+                            if (opponent && opponent.readyState === WebSocket.OPEN) {
+                                sendMessage(opponent, {
+                                    type: 'match_declined',
+                                    payload: { message: 'Opponent declined the match.' }
+                                });
+                            }
+                            
+                            // Clean up room and pending match
+                            pendingMatches.delete(roomId);
+                            handleRoomCleanup(roomId);
+                        }
+                    }
                     break;
 
                 case 'create_private_match':
@@ -685,22 +763,56 @@ wss.on('connection', (ws) => {
 });
 
 // --- Utility Functions ---
-function createRoom(player1, player2, roomType = 'public') {
-    const roomId = `room-${roomIdCounter++}`;
-    console.log(`Creating ${roomType} room ${roomId} for Player ${player1.playerNumber || '(connecting)'} and Player ${player2.playerNumber || '(connecting)'}`);
+function createRoom(player1, player2, roomType = 'public', autoStart = true) {
+    const roomId = `room_${roomIdCounter++}`;
+    
+    console.log(`Creating ${roomType} room ${roomId} for players ${player1.userId} and ${player2.userId}`);
+    
+    // Assign room to both players
     player1.roomId = roomId;
-    player1.playerNumber = 1;
     player2.roomId = roomId;
+    
+    // Assign player numbers
+    player1.playerNumber = 1;
     player2.playerNumber = 2;
-
-    const room = { id: roomId, player1: player1, player2: player2 };
-    gameRooms.set(roomId, room);
-
-    // Notify both players they are matched
-    sendMessage(player1, { type: 'match_found', payload: { opponentFound: true, playerNumber: 1, roomId: roomId } });
-    sendMessage(player2, { type: 'match_found', payload: { opponentFound: true, playerNumber: 2, roomId: roomId } });
-    console.log(`Room ${roomId}: Sent match_found to both players.`);
-
+    
+    // Reset player states
+    player1.lost = false;
+    player2.lost = false;
+    player1.lastScore = null;
+    player1.lastLines = null;
+    player2.lastScore = null;
+    player2.lastLines = null;
+    
+    // Create and store the room
+    gameRooms.set(roomId, {
+        id: roomId,
+        player1: player1,
+        player2: player2,
+        roomType: roomType,
+        created: Date.now()
+    });
+    
+    // Send match found notification to both players
+    const matchFoundPayload = { opponentFound: true, roomId: roomId };
+    
+    sendMessage(player1, { 
+        type: 'match_found', 
+        payload: { ...matchFoundPayload, playerNumber: 1 } 
+    });
+    
+    sendMessage(player2, { 
+        type: 'match_found', 
+        payload: { ...matchFoundPayload, playerNumber: 2 } 
+    });
+    
+    // Start the game immediately for private matches or if autoStart is true
+    if (autoStart) {
+        // Private matches or other auto-start scenarios would immediately start
+        sendMessage(player1, { type: 'match_accepted', payload: {} });
+        sendMessage(player2, { type: 'match_accepted', payload: {} });
+    }
+    
     return roomId;
 }
 

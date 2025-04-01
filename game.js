@@ -187,6 +187,29 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Set up start screen
   showStartScreen();
+  
+  // Add event listeners for match accept/decline buttons
+  const acceptMatchButton = document.getElementById("acceptMatchButton");
+  const declineMatchButton = document.getElementById("declineMatchButton");
+  
+  acceptMatchButton.addEventListener("click", () => {
+    document.getElementById("matchFoundDialog").style.display = "none";
+    // Accept the match via WebSocket
+    if (ws) {
+      ws.send(JSON.stringify({ type: "accept_match" }));
+    }
+  });
+  
+  declineMatchButton.addEventListener("click", () => {
+    document.getElementById("matchFoundDialog").style.display = "none";
+    // Decline the match via WebSocket
+    if (ws) {
+      ws.send(JSON.stringify({ type: "decline_match" }));
+    }
+    // Reset matchmaking state
+    searchingForMatch = false;
+    enableStartScreen();
+  });
 });
 
 // --- Initial rendering contexts ---
@@ -340,23 +363,47 @@ function handleServerMessage(message) {
     case "match_found":
       gameWon = false; // Reset win state on new match
       if (message.payload.opponentFound) {
-        hideStartScreen(); // Hide lobby screen
+        // Instead of immediately starting the game, show the match found dialog
         console.log(
           `Match found! You are Player ${message.payload.playerNumber}. Room: ${message.payload.roomId}`
         );
         playerNumber = message.payload.playerNumber;
         roomId = message.payload.roomId;
-        updateStatus(`Opponent found! Player ${playerNumber}. Starting...`);
+        
+        // Show the match found dialog
+        const matchFoundDialog = document.getElementById("matchFoundDialog");
+        const matchFoundMessage = document.getElementById("matchFoundMessage");
+        matchFoundMessage.textContent = `An opponent has been found! You will play as Player ${playerNumber}.`;
+        matchFoundDialog.style.display = "block";
+        
         // Reset search state when match is found
         searchingForMatch = false;
-        // TODO: Implement countdown?
-        showGameArea(); // Show the main game UI
-        initOpponentBoard(); // Initialize opponent display
-        resetGame(); // Reset game state (which calls gameLoop)
+        updateStatus("Match found! Accept or decline the match.");
       } else {
         console.log("Waiting for an opponent...");
         updateStatus("Searching for opponent...");
       }
+      break;
+
+    case "match_accepted":
+      // When both players have accepted, game actually starts
+      const matchFoundDialog = document.getElementById("matchFoundDialog");
+      matchFoundDialog.style.display = "none";
+      
+      hideStartScreen(); // Hide lobby screen
+      updateStatus(`Match accepted! Starting game as Player ${playerNumber}...`);
+      showGameArea(); // Show the main game UI
+      initOpponentBoard(); // Initialize opponent display
+      resetGame(); // Reset game state (which calls gameLoop)
+      break;
+
+    case "match_declined":
+      // Handle when opponent declines the match
+      document.getElementById("matchFoundDialog").style.display = "none";
+      updateStatus("Opponent declined the match. You can search for another game.");
+      // Reset matchmaking state
+      searchingForMatch = false;
+      enableStartScreen();
       break;
 
     case "opponent_piece_locked":

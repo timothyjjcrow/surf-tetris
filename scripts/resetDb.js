@@ -1,4 +1,20 @@
 // resetDb.js - Script to reset database tables while preserving schema
+const dotenv = require('dotenv');
+
+// Load environment variables from .env.reset file if it exists
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    const result = dotenv.config({ path: '.env.reset' });
+    if (result.error) {
+      console.log('No .env.reset file found, using default environment');
+    } else {
+      console.log('Loaded database connection info from .env.reset file');
+    }
+  } catch (error) {
+    console.error('Error loading .env.reset file:', error);
+  }
+}
+
 const db = require('../dbConfig');
 const readline = require('readline');
 
@@ -8,9 +24,16 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
+// Print current connection info (without sensitive values)
+console.log('Database connection info:');
+console.log(`- Host: ${process.env.DB_HOST || 'localhost'}`);
+console.log(`- Database: ${process.env.DB_NAME || 'tetris'}`);
+console.log(`- User: ${process.env.DB_USER || 'postgres'}`);
+console.log(`- Port: ${process.env.DB_PORT || 5432}`);
+
 // Reset specific tables without dropping them
 async function resetDatabaseTables() {
-  console.log('WARNING: This will delete ALL users and game stats data.');
+  console.log('\nWARNING: This will delete ALL users and game stats data.');
   
   rl.question('Are you sure you want to continue? (yes/no): ', async (answer) => {
     if (answer.toLowerCase() !== 'yes') {
