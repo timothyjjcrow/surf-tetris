@@ -444,9 +444,48 @@ wss.on('connection', (ws) => {
                     break;
 
                 case 'user_auth':
-                    if (data.payload && data.payload.userId) {
+                    if (data.payload && data.payload.token) {
+                        try {
+                            // Verify and decode the JWT token
+                            const JWT_SECRET = process.env.JWT_SECRET || 'tetris-secret-key-12345';
+                            const decoded = jwt.verify(data.payload.token, JWT_SECRET);
+                            
+                            // Extract user information from the token
+                            ws.userId = decoded.userId;
+                            ws.username = decoded.username;
+                            
+                            console.log(`User authenticated from token: UserID=${ws.userId}, Username=${ws.username}`);
+                            
+                            // Confirm authentication to client
+                            sendMessage(ws, {
+                                type: 'auth_confirmed',
+                                payload: { 
+                                    message: 'Authentication successful',
+                                    userId: ws.userId,
+                                    username: ws.username
+                                }
+                            });
+                            
+                            // Debug log all authenticated clients
+                            console.log('Currently authenticated clients:');
+                            wss.clients.forEach(client => {
+                                if (client.userId) {
+                                    console.log(`- Client: User ID ${client.userId}`);
+                                }
+                            });
+                        } catch (error) {
+                            console.error('Token verification failed:', error);
+                            sendMessage(ws, {
+                                type: 'auth_error',
+                                payload: { 
+                                    message: 'Authentication failed: Invalid token'
+                                }
+                            });
+                        }
+                    } else if (data.payload && data.payload.userId) {
+                        // Fallback to direct userId authentication (less secure)
                         ws.userId = data.payload.userId;
-                        console.log(`User authenticated: ${ws.userId}`);
+                        console.log(`User authenticated with direct ID: ${ws.userId}`);
                         
                         // Confirm authentication to client
                         sendMessage(ws, {
@@ -454,14 +493,6 @@ wss.on('connection', (ws) => {
                             payload: { 
                                 message: 'Authentication successful',
                                 userId: ws.userId
-                            }
-                        });
-                        
-                        // Debug log all authenticated clients
-                        console.log('Currently authenticated clients:');
-                        wss.clients.forEach(client => {
-                            if (client.userId) {
-                                console.log(`- Client ${client.id}: User ID ${client.userId}`);
                             }
                         });
                     }

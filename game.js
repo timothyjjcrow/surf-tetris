@@ -214,9 +214,9 @@ function connectWebSocket() {
     const userId = localStorage.getItem('tetris_user_id');
     
     // Send authentication if we have the user data
-    if (token && userId) {
-      console.log(`Authenticating with user ID: ${userId}`);
-      sendMessageToServer('user_auth', { userId, token });
+    if (token) {
+      console.log(`Authenticating with token, userId from localStorage: ${userId || 'not found'}`);
+      sendMessageToServer('user_auth', { token });
     } else {
       console.log('No authentication data found in localStorage');
     }
@@ -445,6 +445,14 @@ function handleServerMessage(message) {
 
     case "auth_confirmed":
       console.log("Authentication confirmed by server for user ID:", message.payload.userId);
+      // Update localStorage with the userId from the server (in case it was missing)
+      if (message.payload.userId) {
+        localStorage.setItem('tetris_user_id', message.payload.userId);
+        console.log(`Updated localStorage with user ID: ${message.payload.userId}`);
+      }
+      if (message.payload.username) {
+        localStorage.setItem('tetris_username', message.payload.username);
+      }
       break;
 
     default:
