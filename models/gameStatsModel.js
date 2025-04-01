@@ -150,14 +150,13 @@ const gameStatsModel = {
       // Record the match in match_history with correct player IDs
       const matchHistoryResult = await client.query(
         `INSERT INTO match_history 
-         (player1_id, player2_id, winner_id, loser_id, player1_score, player2_score, player1_lines, player2_lines, player1_elo_change, player2_elo_change, match_date) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+         (player1_id, player2_id, winner_id, player1_score, player2_score, player1_lines, player2_lines, player1_elo_change, player2_elo_change, match_date) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
          RETURNING id`,
         [
           player1Id,
           player2Id,
           winnerId,
-          winnerId === player1Id ? player2Id : player1Id,
           winnerId === player1Id ? matchData.winnerScore || 0 : matchData.loserScore || 0,
           winnerId === player2Id ? matchData.winnerScore || 0 : matchData.loserScore || 0,
           winnerId === player1Id ? matchData.winnerLines || 0 : matchData.loserLines || 0,

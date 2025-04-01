@@ -317,19 +317,17 @@ wss.on('connection', (ws) => {
                                     console.log(`Player ${ws.userId} lost: ${ws.lost}, Player ${opponent.userId} lost: ${opponent.lost}`);
                                     
                                     // Determine winner based on who is still playing (not lost)
-                                    let winnerId, loserId;
+                                    let winnerId;
                                     
                                     // In case both players lost (e.g. disconnection), use the one with higher score
                                     if (ws.lost && opponent.lost) {
                                         winnerId = (ws.lastScore || 0) > (opponent.lastScore || 0) ? ws.userId : opponent.userId;
-                                        loserId = winnerId === ws.userId ? opponent.userId : ws.userId;
                                         console.log(`Both players lost, winner determined by score. Winner: ${winnerId}`);
                                     } else {
                                         winnerId = ws.lost ? opponent.userId : ws.userId;
-                                        loserId = ws.lost ? ws.userId : opponent.userId;
                                     }
                                     
-                                    console.log(`Winner: ${winnerId}, Loser: ${loserId}`);
+                                    console.log(`Winner: ${winnerId}`);
                                     console.log(`Player 1 score: ${ws.lastScore || 0}, Player 2 score: ${opponent.lastScore || 0}`);
                                     
                                     // Match data includes scores and lines cleared
@@ -350,7 +348,7 @@ wss.on('connection', (ws) => {
                                     gameStatsModel.recordMatchResult(ws.userId, opponent.userId, winnerId, matchData)
                                         .then((result) => {
                                             if (result.success) {
-                                                console.log(`Match result recorded: ${winnerId} won against ${loserId}`);
+                                                console.log(`Match result recorded: ${winnerId} won against ${opponent.userId}`);
                                                 console.log('ELO changes:', {
                                                     player1EloChange: result.player1EloChange || 0,
                                                     player2EloChange: result.player2EloChange || 0
@@ -760,7 +758,7 @@ function handleRoomCleanup(roomId, disconnectedPlayerId = null) {
     
     if (player1Client.userId && player2Client.userId && (player1Lost || player2Lost)) {
       // Determine winner based on who didn't lose
-      let winnerId, loserId;
+      let winnerId;
       
       if (player1Lost && player2Lost) {
         // If both lost, use score as tiebreaker
@@ -768,16 +766,16 @@ function handleRoomCleanup(roomId, disconnectedPlayerId = null) {
       } else {
         winnerId = player1Lost ? player2Client.userId : player1Client.userId;
       }
-      loserId = winnerId === player1Client.userId ? player2Client.userId : player1Client.userId;
       
-      console.log(`Recording match in cleanup: Winner=${winnerId}, Loser=${loserId}`);
+      // For logging purposes only
+      console.log(`Recording match in cleanup: Winner=${winnerId}`);
       
       // Match data with scores
       const matchData = {
         winnerScore: winnerId === player1Client.userId ? (player1Client.lastScore || 0) : (player2Client.lastScore || 0),
-        loserScore: loserId === player1Client.userId ? (player1Client.lastScore || 0) : (player2Client.lastScore || 0),
+        loserScore: winnerId !== player1Client.userId ? (player1Client.lastScore || 0) : (player2Client.lastScore || 0),
         winnerLines: winnerId === player1Client.userId ? (player1Client.lastLines || 0) : (player2Client.lastLines || 0),
-        loserLines: loserId === player1Client.userId ? (player1Client.lastLines || 0) : (player2Client.lastLines || 0)
+        loserLines: winnerId !== player1Client.userId ? (player1Client.lastLines || 0) : (player2Client.lastLines || 0)
       };
       
       // Record the match result
@@ -785,7 +783,7 @@ function handleRoomCleanup(roomId, disconnectedPlayerId = null) {
       gameStatsModel.recordMatchResult(player1Client.userId, player2Client.userId, winnerId, matchData)
         .then(result => {
           if (result.success) {
-            console.log(`Match result recorded on room cleanup: ${winnerId} won against ${loserId}`);
+            console.log(`Match result recorded on room cleanup: ${winnerId} won`);
             console.log('ELO changes:', {
               player1EloChange: result.player1EloChange || 0,
               player2EloChange: result.player2EloChange || 0
