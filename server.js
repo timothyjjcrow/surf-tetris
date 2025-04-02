@@ -1093,6 +1093,25 @@ function handleRoomCleanup(roomId, disconnectedPlayerId = null) {
 // Initialize database
 initializeDatabase();
 
+// Run database migrations if needed
+try {
+  const { runMigration } = require('./migrations/add_apm_columns');
+  console.log('Running APM columns migration...');
+  runMigration()
+    .then(result => {
+      if (result.success) {
+        console.log('APM columns migration successful');
+      } else {
+        console.warn('APM columns migration failed:', result.error);
+      }
+    })
+    .catch(err => {
+      console.error('Error running APM columns migration:', err);
+    });
+} catch (err) {
+  console.warn('APM migration script not found or failed to load:', err.message);
+}
+
 // Start the HTTP server (which also handles WebSocket upgrades)
 server.listen(PORT, () => {
     console.log(`HTTP server listening on port ${PORT}, serving static files and handling WebSocket connections.`);
