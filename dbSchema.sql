@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS player_stats (
   games_played INTEGER DEFAULT 0,
   highest_score INTEGER DEFAULT 0,
   most_lines_cleared INTEGER DEFAULT 0,
+  highest_apm INTEGER DEFAULT 0,
+  avg_apm INTEGER DEFAULT 0,
   PRIMARY KEY (user_id)
 );
 
@@ -32,6 +34,8 @@ CREATE TABLE IF NOT EXISTS match_history (
   player2_score INTEGER DEFAULT 0,
   player1_lines INTEGER DEFAULT 0,
   player2_lines INTEGER DEFAULT 0,
+  player1_apm INTEGER DEFAULT 0,
+  player2_apm INTEGER DEFAULT 0,
   player1_elo_change INTEGER DEFAULT 0,
   player2_elo_change INTEGER DEFAULT 0,
   match_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

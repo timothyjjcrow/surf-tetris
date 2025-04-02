@@ -133,6 +133,7 @@ wss.on('connection', (ws) => {
     ws.userId = null; // Add userId for authenticated users
     ws.lastScore = null; // Add lastScore for match result recording
     ws.lastLines = null; // Add lastLines for match result recording
+    ws.lastApm = null; // Add lastApm for match result recording
 
     // Send initial status or welcome message if desired
     sendMessage(ws, { type: 'status', payload: { message: 'Connected to server. Choose match type.' } });
@@ -494,6 +495,11 @@ wss.on('connection', (ws) => {
                             console.log(`Player ${ws.playerNumber} final lines: ${ws.lastLines}`);
                         }
                         
+                        if (data.payload.apm !== undefined) {
+                            ws.lastApm = parseInt(data.payload.apm) || 0;
+                            console.log(`Player ${ws.playerNumber} final APM: ${ws.lastApm}`);
+                        }
+                        
                         // Check if the other player is still playing
                         const opponent = (ws === currentRoom.player1) ? currentRoom.player2 : currentRoom.player1;
                         if (opponent && opponent.readyState === WebSocket.OPEN) {
@@ -503,7 +509,8 @@ wss.on('connection', (ws) => {
                                 payload: {
                                     message: 'Your opponent lost!',
                                     opponentScore: data.payload.score || 0,
-                                    opponentLines: data.payload.linesCleared || 0
+                                    opponentLines: data.payload.linesCleared || 0,
+                                    opponentApm: data.payload.apm || 0
                                 }
                             });
                             
@@ -514,7 +521,8 @@ wss.on('connection', (ws) => {
                                     payload: {
                                         message: 'You lost!',
                                         opponentScore: 0, // We don't have this info yet
-                                        opponentLines: 0 // We don't have this info yet
+                                        opponentLines: 0, // We don't have this info yet
+                                        opponentApm: 0 // We don't have this info yet
                                     }
                                 });
                             }
@@ -544,13 +552,16 @@ wss.on('connection', (ws) => {
                                     
                                     console.log(`Winner: ${winnerId}`);
                                     console.log(`Player 1 score: ${ws.lastScore || 0}, Player 2 score: ${opponent.lastScore || 0}`);
+                                    console.log(`Player 1 APM: ${ws.lastApm || 0}, Player 2 APM: ${opponent.lastApm || 0}`);
                                     
                                     // Match data includes scores and lines cleared
                                     const matchData = {
                                         winnerScore: ws.lost ? (opponent.lastScore || 0) : (ws.lastScore || 0),
                                         loserScore: ws.lost ? (ws.lastScore || 0) : (opponent.lastScore || 0),
                                         winnerLines: ws.lost ? (opponent.lastLines || 0) : (ws.lastLines || 0),
-                                        loserLines: ws.lost ? (ws.lastLines || 0) : (opponent.lastLines || 0)
+                                        loserLines: ws.lost ? (ws.lastLines || 0) : (opponent.lastLines || 0),
+                                        winnerApm: ws.lost ? (opponent.lastApm || 0) : (ws.lastApm || 0),
+                                        loserApm: ws.lost ? (ws.lastApm || 0) : (opponent.lastApm || 0)
                                     };
                                     
                                     // For debugging
@@ -691,6 +702,7 @@ wss.on('connection', (ws) => {
                 case 'update_score':
                     ws.lastScore = data.payload.score;
                     ws.lastLines = data.payload.lines;
+                    ws.lastApm = data.payload.apm;
                     
                     // If user ID is provided, make sure it's set
                     if (data.payload.userId) {
@@ -698,7 +710,7 @@ wss.on('connection', (ws) => {
                         console.log(`Updated user ID in score update: ${ws.userId}`);
                     }
                     
-                    console.log(`Player ${ws.playerNumber} updated score: ${ws.lastScore}, lines: ${ws.lastLines}, userId: ${ws.userId || 'not set'}`);
+                    console.log(`Player ${ws.playerNumber} updated score: ${ws.lastScore}, lines: ${ws.lastLines}, APM: ${ws.lastApm}, userId: ${ws.userId || 'not set'}`);
                     break;
 
                 case 'user_auth':
@@ -834,8 +846,10 @@ function createRoom(player1, player2, roomType = 'public', autoStart = true) {
     player2.lost = false;
     player1.lastScore = null;
     player1.lastLines = null;
+    player1.lastApm = null;
     player2.lastScore = null;
     player2.lastLines = null;
+    player2.lastApm = null;
     
     // Create and store the room
     gameRooms.set(roomId, {
@@ -1030,7 +1044,9 @@ function handleRoomCleanup(roomId, disconnectedPlayerId = null) {
         winnerScore: winnerId === player1Client.userId ? (player1Client.lastScore || 0) : (player2Client.lastScore || 0),
         loserScore: winnerId !== player1Client.userId ? (player1Client.lastScore || 0) : (player2Client.lastScore || 0),
         winnerLines: winnerId === player1Client.userId ? (player1Client.lastLines || 0) : (player2Client.lastLines || 0),
-        loserLines: winnerId !== player1Client.userId ? (player1Client.lastLines || 0) : (player2Client.lastLines || 0)
+        loserLines: winnerId !== player1Client.userId ? (player1Client.lastLines || 0) : (player2Client.lastLines || 0),
+        winnerApm: winnerId === player1Client.userId ? (player1Client.lastApm || 0) : (player2Client.lastApm || 0),
+        loserApm: winnerId !== player1Client.userId ? (player1Client.lastApm || 0) : (player2Client.lastApm || 0)
       };
       
       // Record the match result

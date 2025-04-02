@@ -282,6 +282,11 @@ let mobileControls = null;
 let ws = null;
 const SERVER_URL = `ws://${window.location.hostname}:8080`; // Adjust if server is elsewhere
 
+// APM tracking variables
+let actionCount = 0;
+let gameTimeInMinutes = 0;
+let apm = 0;
+
 function connectWebSocket() {
   // Determine WebSocket protocol based on page protocol
   let wsUrl;
@@ -1916,7 +1921,10 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault(); // Prevent default browser actions (like space scrolling)
     // Try both event.code (for KeyC) and event.key (for "c" or "C")
     const handler = keyMap[event.code] || keyMap[event.key];
-    if (handler) handler();
+    if (handler) {
+      handler();
+      incrementActionCount();
+    }
   }
 });
 
@@ -1955,6 +1963,7 @@ function startMovement(key) {
     if (keyMap[key]) {
       moveInterval = setInterval(() => {
         keyMap[key]();
+        incrementActionCount();
       }, repeatRate);
     }
   }, repeatDelay);
@@ -2144,7 +2153,8 @@ function checkGameOver() {
               sendMessageToServer("game_over", { 
                 score,
                 linesCleared,
-                userId
+                userId,
+                apm // Send APM to server
               });
               console.log("Sent game_over message to server with score:", score, "lines:", linesCleared, "userId:", userId);
             } else {
@@ -2153,7 +2163,8 @@ function checkGameOver() {
                 score, 
                 linesCleared,
                 // Send an empty user ID indicator to help with debugging
-                noUserId: true
+                noUserId: true,
+                apm // Send APM to server
               });
               console.log("WARNING: Sent game_over message without user ID. Authentication may be missing!");
             }
@@ -2245,10 +2256,11 @@ function sendScoreUpdate() {
     sendMessageToServer("update_score", {
       score: score,
       lines: linesCleared,
-      userId: userId // Send user ID with each score update
+      userId: userId, // Send user ID with each score update
+      apm // Send APM to server
     });
     
-    console.log(`Score update sent: Score=${score}, Lines=${linesCleared}, UserID=${userId || 'not logged in'}`);
+    console.log(`Score update sent: Score=${score}, Lines=${linesCleared}, UserID=${userId || 'not logged in'}, APM=${apm}`);
   }
 }
 
@@ -2272,4 +2284,14 @@ let scoreUpdateInterval = null;
 function getLinePoints(lines) {
   const points = [0, 100, 300, 500, 800];
   return points[lines];
+}
+
+function incrementActionCount() {
+  actionCount++;
+  // Calculate current game time in minutes
+  gameTimeInMinutes = (Date.now() - gameStartTime) / 60000;
+  // Calculate APM
+  if (gameTimeInMinutes > 0) {
+    apm = Math.round(actionCount / gameTimeInMinutes);
+  }
 }

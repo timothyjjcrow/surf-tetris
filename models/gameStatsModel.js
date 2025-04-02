@@ -40,12 +40,16 @@ const gameStatsModel = {
       matchData.loserScore = matchData.loserScore || 0;
       matchData.winnerLines = matchData.winnerLines || 0;
       matchData.loserLines = matchData.loserLines || 0;
+      matchData.winnerApm = matchData.winnerApm || 0;
+      matchData.loserApm = matchData.loserApm || 0;
       
       console.log('Validated match data:', {
         winnerScore: matchData.winnerScore,
         loserScore: matchData.loserScore,
         winnerLines: matchData.winnerLines,
-        loserLines: matchData.loserLines
+        loserLines: matchData.loserLines,
+        winnerApm: matchData.winnerApm,
+        loserApm: matchData.loserApm
       });
       
       client = await db.pool.connect();
@@ -64,7 +68,7 @@ const gameStatsModel = {
       if (parseInt(player1CheckResult.rows[0].count) === 0) {
         console.log(`Creating new stats record for player ${player1Id}`);
         await client.query(
-          'INSERT INTO player_stats (user_id, elo_rating, wins, losses, games_played) VALUES ($1, 1200, 0, 0, 0)',
+          'INSERT INTO player_stats (user_id, elo_rating, wins, losses, games_played, highest_score, most_lines_cleared, highest_apm, avg_apm) VALUES ($1, 1200, 0, 0, 0, 0, 0, 0, 0)',
           [player1Id]
         );
       }
@@ -78,14 +82,14 @@ const gameStatsModel = {
       if (parseInt(player2CheckResult.rows[0].count) === 0) {
         console.log(`Creating new stats record for player ${player2Id}`);
         await client.query(
-          'INSERT INTO player_stats (user_id, elo_rating, wins, losses, games_played) VALUES ($1, 1200, 0, 0, 0)',
+          'INSERT INTO player_stats (user_id, elo_rating, wins, losses, games_played, highest_score, most_lines_cleared, highest_apm, avg_apm) VALUES ($1, 1200, 0, 0, 0, 0, 0, 0, 0)',
           [player2Id]
         );
       }
       
       // Now get the current stats
       const player1StatsResult = await client.query(
-        'SELECT elo_rating, wins, losses FROM player_stats WHERE user_id = $1',
+        'SELECT elo_rating, wins, losses, games_played, highest_score, most_lines_cleared, highest_apm, avg_apm FROM player_stats WHERE user_id = $1',
         [player1Id]
       );
       
@@ -96,7 +100,7 @@ const gameStatsModel = {
       console.log('Player 1 stats retrieved:', player1StatsResult.rows[0]);
       
       const player2StatsResult = await client.query(
-        'SELECT elo_rating, wins, losses FROM player_stats WHERE user_id = $1',
+        'SELECT elo_rating, wins, losses, games_played, highest_score, most_lines_cleared, highest_apm, avg_apm FROM player_stats WHERE user_id = $1',
         [player2Id]
       );
       
@@ -130,12 +134,23 @@ const gameStatsModel = {
          SET elo_rating = $1, 
              wins = CASE WHEN $2 = user_id THEN wins + 1 ELSE wins END, 
              losses = CASE WHEN $2 != user_id THEN losses + 1 ELSE losses END, 
-             games_played = games_played + 1 
-         WHERE user_id = $3
-         RETURNING elo_rating, wins, losses, games_played`,
+             games_played = games_played + 1,
+             highest_score = GREATEST(highest_score, $3),
+             most_lines_cleared = GREATEST(most_lines_cleared, $4),
+             highest_apm = GREATEST(highest_apm, $5),
+             avg_apm = CASE 
+                          WHEN games_played > 0 THEN 
+                            ((avg_apm * games_played) + $5) / (games_played + 1)
+                          ELSE $5
+                       END
+         WHERE user_id = $6
+         RETURNING elo_rating, wins, losses, games_played, highest_apm, avg_apm`,
         [
           player1Stats.elo_rating + player1EloChange,
           winnerId,
+          winnerId === player1Id ? matchData.winnerScore : matchData.loserScore,
+          winnerId === player1Id ? matchData.winnerLines : matchData.loserLines,
+          winnerId === player1Id ? matchData.winnerApm : matchData.loserApm,
           player1Id
         ]
       );
@@ -148,12 +163,23 @@ const gameStatsModel = {
          SET elo_rating = $1, 
              wins = CASE WHEN $2 = user_id THEN wins + 1 ELSE wins END, 
              losses = CASE WHEN $2 != user_id THEN losses + 1 ELSE losses END, 
-             games_played = games_played + 1 
-         WHERE user_id = $3
-         RETURNING elo_rating, wins, losses, games_played`,
+             games_played = games_played + 1,
+             highest_score = GREATEST(highest_score, $3),
+             most_lines_cleared = GREATEST(most_lines_cleared, $4),
+             highest_apm = GREATEST(highest_apm, $5),
+             avg_apm = CASE 
+                          WHEN games_played > 0 THEN 
+                            ((avg_apm * games_played) + $5) / (games_played + 1)
+                          ELSE $5
+                       END
+         WHERE user_id = $6
+         RETURNING elo_rating, wins, losses, games_played, highest_apm, avg_apm`,
         [
           player2Stats.elo_rating + player2EloChange,
           winnerId,
+          winnerId === player2Id ? matchData.winnerScore : matchData.loserScore,
+          winnerId === player2Id ? matchData.winnerLines : matchData.loserLines,
+          winnerId === player2Id ? matchData.winnerApm : matchData.loserApm,
           player2Id
         ]
       );
@@ -163,8 +189,8 @@ const gameStatsModel = {
       // Record the match in match_history with correct player IDs
       const matchHistoryResult = await client.query(
         `INSERT INTO match_history 
-         (player1_id, player2_id, winner_id, player1_score, player2_score, player1_lines, player2_lines, player1_elo_change, player2_elo_change, match_date) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+         (player1_id, player2_id, winner_id, player1_score, player2_score, player1_lines, player2_lines, player1_apm, player2_apm, player1_elo_change, player2_elo_change, match_date) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
          RETURNING id`,
         [
           player1Id,
@@ -174,6 +200,8 @@ const gameStatsModel = {
           winnerId === player2Id ? matchData.winnerScore : matchData.loserScore,
           winnerId === player1Id ? matchData.winnerLines : matchData.loserLines,
           winnerId === player2Id ? matchData.winnerLines : matchData.loserLines,
+          winnerId === player1Id ? matchData.winnerApm : matchData.loserApm,
+          winnerId === player2Id ? matchData.winnerApm : matchData.loserApm,
           player1EloChange,
           player2EloChange
         ]
@@ -255,6 +283,8 @@ const gameStatsModel = {
             END
           )) FROM match_history mh 
            WHERE mh.player1_id = u.id OR mh.player2_id = u.id), 0) as avg_lines,
+          COALESCE(ps.avg_apm, 0) as avg_apm,
+          ps.highest_apm as max_apm,
           (SELECT COUNT(*) FROM match_history mh 
            WHERE (mh.player1_id = u.id OR mh.player2_id = u.id)) as total_matches
         FROM player_stats ps
@@ -278,7 +308,7 @@ const gameStatsModel = {
       const result = await db.query(
         `SELECT 
           mh.id, mh.match_date, mh.player1_score, mh.player2_score,
-          mh.player1_lines, mh.player2_lines, mh.player1_elo_change, mh.player2_elo_change,
+          mh.player1_lines, mh.player2_lines, mh.player1_apm, mh.player2_apm, mh.player1_elo_change, mh.player2_elo_change,
           u1.username as player1_username, u2.username as player2_username,
           CASE WHEN mh.winner_id = $1 THEN true ELSE false END as player_won
         FROM match_history mh

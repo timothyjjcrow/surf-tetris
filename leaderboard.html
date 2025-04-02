@@ -282,6 +282,8 @@
             }
             
             /* Show only the most important columns on smaller screens */
+            .leaderboard th:nth-child(9),
+            .leaderboard td:nth-child(9),
             .leaderboard th:nth-child(8),
             .leaderboard td:nth-child(8),
             .leaderboard th:nth-child(7),
@@ -494,6 +496,16 @@
                 </div>
                 
                 <div class="stat-group">
+                    <div class="stat-label">Avg. APM</div>
+                    <div id="profile-avg-apm" class="stat-value">-</div>
+                </div>
+                
+                <div class="stat-group">
+                    <div class="stat-label">Max APM</div>
+                    <div id="profile-max-apm" class="stat-value">-</div>
+                </div>
+                
+                <div class="stat-group">
                     <div class="stat-label">Total Matches</div>
                     <div id="profile-total-matches" class="stat-value">-</div>
                 </div>
@@ -515,12 +527,13 @@
                             <th>Win Rate</th>
                             <th>Avg Score</th>
                             <th>Avg Lines</th>
+                            <th>Avg APM</th>
                             <th>Matches</th>
                         </tr>
                     </thead>
                     <tbody id="leaderboard-body">
                         <tr class="loading">
-                            <td colspan="9">Loading leaderboard data...</td>
+                            <td colspan="10">Loading leaderboard data...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -571,7 +584,7 @@
                     const leaderboardBody = document.getElementById('leaderboard-body');
                     leaderboardBody.innerHTML = `
                         <tr>
-                            <td colspan="9" style="text-align: center;">Loading leaderboard data...</td>
+                            <td colspan="10" style="text-align: center;">Loading leaderboard data...</td>
                         </tr>
                     `;
                     
@@ -613,7 +626,7 @@
                     console.error('Error fetching leaderboard:', error);
                     document.getElementById('leaderboard-body').innerHTML = `
                         <tr class="error">
-                            <td colspan="9">Error loading leaderboard data: ${error.message}. Please try refreshing.</td>
+                            <td colspan="10">Error loading leaderboard data: ${error.message}. Please try refreshing.</td>
                         </tr>
                     `;
                 }
@@ -631,6 +644,8 @@
                 // New stats
                 document.getElementById('profile-avg-score').textContent = userStats.avg_score || '-';
                 document.getElementById('profile-avg-lines').textContent = userStats.avg_lines || '-';
+                document.getElementById('profile-avg-apm').textContent = userStats.avg_apm || '-';
+                document.getElementById('profile-max-apm').textContent = userStats.max_apm || '-';
                 document.getElementById('profile-total-matches').textContent = userStats.total_matches || '-';
             }
             
@@ -640,7 +655,7 @@
                 if (players.length === 0) {
                     leaderboardBody.innerHTML = `
                         <tr>
-                            <td colspan="9" style="text-align: center;">No players on the leaderboard yet.</td>
+                            <td colspan="10" style="text-align: center;">No players on the leaderboard yet.</td>
                         </tr>
                     `;
                     return;
@@ -661,6 +676,7 @@
                     const avgScore = player.avg_score || '-';
                     const avgLines = player.avg_lines || '-';
                     const totalMatches = player.total_matches || '0';
+                    const avgApm = player.avg_apm || '-';
                     
                     return `
                         <tr ${highlightCurrentUser}>
@@ -672,6 +688,7 @@
                             <td class="numeric-cell">${player.win_percentage}%</td>
                             <td class="numeric-cell">${avgScore}</td>
                             <td class="numeric-cell">${avgLines}</td>
+                            <td class="numeric-cell">${avgApm}</td>
                             <td class="numeric-cell">${totalMatches}</td>
                         </tr>
                     `;
