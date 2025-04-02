@@ -81,12 +81,17 @@ app.get('/api/stats/leaderboard', async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
     
+    // Use the statsRoutes module to ensure we get the latest data
+    const statsRoutes = require('./routes/statsRoutes');
+    await statsRoutes.refreshLeaderboardCache();
+    
     const result = await gameStatsModel.getLeaderboardWithStats(limit, offset);
     
     if (!result.success) {
       return res.status(500).json({ error: result.error });
     }
     
+    console.log(`Returning leaderboard with ${result.leaderboard.length} entries`);
     res.json(result.leaderboard);
   } catch (error) {
     console.error('Error serving leaderboard:', error);
@@ -478,13 +483,14 @@ wss.on('connection', (ws) => {
                         ws.lost = true;
                         
                         // Save score and lines in case they weren't updated recently
+                        // Use explicit type conversion to ensure we store numbers
                         if (data.payload.score !== undefined) {
-                            ws.lastScore = data.payload.score;
+                            ws.lastScore = parseInt(data.payload.score) || 0;
                             console.log(`Player ${ws.playerNumber} final score: ${ws.lastScore}`);
                         }
                         
                         if (data.payload.linesCleared !== undefined) {
-                            ws.lastLines = data.payload.linesCleared;
+                            ws.lastLines = parseInt(data.payload.linesCleared) || 0;
                             console.log(`Player ${ws.playerNumber} final lines: ${ws.lastLines}`);
                         }
                         

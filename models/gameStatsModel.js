@@ -27,13 +27,26 @@ const gameStatsModel = {
       console.log(`Player 1 ID: ${player1Id}`);
       console.log(`Player 2 ID: ${player2Id}`);
       console.log(`Winner ID: ${winnerId}`);
-      console.log('Match data:', matchData);
+      console.log('Match data:', JSON.stringify(matchData));
       
       // Validate inputs to prevent errors
       if (!player1Id || !player2Id || !winnerId) {
         console.error('Missing required player IDs');
         return { success: false, error: 'Missing required player IDs' };
       }
+
+      // Ensure matchData has all required fields
+      matchData.winnerScore = matchData.winnerScore || 0;
+      matchData.loserScore = matchData.loserScore || 0;
+      matchData.winnerLines = matchData.winnerLines || 0;
+      matchData.loserLines = matchData.loserLines || 0;
+      
+      console.log('Validated match data:', {
+        winnerScore: matchData.winnerScore,
+        loserScore: matchData.loserScore,
+        winnerLines: matchData.winnerLines,
+        loserLines: matchData.loserLines
+      });
       
       client = await db.pool.connect();
       console.log('Connected to database');
@@ -157,10 +170,10 @@ const gameStatsModel = {
           player1Id,
           player2Id,
           winnerId,
-          winnerId === player1Id ? matchData.winnerScore || 0 : matchData.loserScore || 0,
-          winnerId === player2Id ? matchData.winnerScore || 0 : matchData.loserScore || 0,
-          winnerId === player1Id ? matchData.winnerLines || 0 : matchData.loserLines || 0,
-          winnerId === player2Id ? matchData.winnerLines || 0 : matchData.loserLines || 0,
+          winnerId === player1Id ? matchData.winnerScore : matchData.loserScore,
+          winnerId === player2Id ? matchData.winnerScore : matchData.loserScore,
+          winnerId === player1Id ? matchData.winnerLines : matchData.loserLines,
+          winnerId === player2Id ? matchData.winnerLines : matchData.loserLines,
           player1EloChange,
           player2EloChange
         ]
@@ -226,22 +239,22 @@ const gameStatsModel = {
           CASE WHEN ps.games_played > 0 THEN
             ROUND((ps.wins::FLOAT / ps.games_played) * 100)
           ELSE 0 END as win_percentage,
-          (SELECT ROUND(AVG(
+          COALESCE((SELECT ROUND(AVG(
             CASE 
               WHEN mh.player1_id = u.id THEN mh.player1_score
               WHEN mh.player2_id = u.id THEN mh.player2_score
               ELSE 0
             END
           )) FROM match_history mh 
-           WHERE mh.player1_id = u.id OR mh.player2_id = u.id) as avg_score,
-          (SELECT ROUND(AVG(
+           WHERE mh.player1_id = u.id OR mh.player2_id = u.id), 0) as avg_score,
+          COALESCE((SELECT ROUND(AVG(
             CASE 
               WHEN mh.player1_id = u.id THEN mh.player1_lines
               WHEN mh.player2_id = u.id THEN mh.player2_lines
               ELSE 0
             END
           )) FROM match_history mh 
-           WHERE mh.player1_id = u.id OR mh.player2_id = u.id) as avg_lines,
+           WHERE mh.player1_id = u.id OR mh.player2_id = u.id), 0) as avg_lines,
           (SELECT COUNT(*) FROM match_history mh 
            WHERE (mh.player1_id = u.id OR mh.player2_id = u.id)) as total_matches
         FROM player_stats ps
@@ -251,6 +264,7 @@ const gameStatsModel = {
         [limit, offset]
       );
       
+      console.log('Enhanced leaderboard data:', result.rows);
       return { success: true, leaderboard: result.rows };
     } catch (error) {
       console.error('Error fetching enhanced leaderboard:', error);

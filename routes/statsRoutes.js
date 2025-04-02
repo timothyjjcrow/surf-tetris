@@ -15,7 +15,7 @@ let leaderboardCacheTime = 0;
 const refreshLeaderboardCache = async () => {
   try {
     console.log('Manually refreshing leaderboard cache');
-    const result = await gameStatsModel.getLeaderboard(50, 0); // Get top 50 players
+    const result = await gameStatsModel.getLeaderboardWithStats(50, 0); // Use enhanced stats function
     
     if (result.success) {
       leaderboardCache = result.leaderboard;
@@ -42,8 +42,8 @@ router.get('/leaderboard', async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
     
-    // Force refresh from database
-    const result = await gameStatsModel.getLeaderboard(limit, offset);
+    // Force refresh from database with enhanced stats
+    const result = await gameStatsModel.getLeaderboardWithStats(limit, offset);
     
     if (!result.success) {
       console.error('Leaderboard fetch error from model:', result.error);
