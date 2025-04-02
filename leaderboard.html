@@ -221,6 +221,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            margin-top: 10px;
         }
         
         .section-title {
@@ -289,8 +290,9 @@
             }
             
             .profile-info {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
                 padding: 15px;
+                gap: 15px;
             }
             
             .stat-value {
@@ -325,8 +327,52 @@
                 font-size: 0.9em;
             }
             
+            /* Improved mobile my stats layout */
+            .profile-info {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                padding: 15px;
+                gap: 0;
+                background-color: #1a1a1a; /* Slightly darker background for better contrast */
+            }
+            
+            .profile-heading {
+                width: 100%;
+                margin-bottom: 10px;
+                text-align: center;
+                border-bottom: 1px solid #333;
+                padding-bottom: 8px;
+            }
+            
+            .profile-heading h2 {
+                margin-bottom: 5px;
+            }
+            
+            .stat-group {
+                width: 50%;
+                margin-bottom: 12px;
+                padding-right: 10px;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .stat-label {
+                font-size: 0.8em;
+                margin-bottom: 2px;
+                color: #888;
+            }
+            
             .stat-value {
                 font-size: 1.2em;
+                line-height: 1.2;
+                width: 100%;
+            }
+            
+            /* Add a clear divider between stat sections */
+            .section-header {
+                margin-top: 10px;
             }
         }
         
@@ -346,8 +392,26 @@
             }
             
             .profile-info {
-                padding: 10px;
-                gap: 10px;
+                padding: 12px 10px;
+            }
+            
+            .stat-group {
+                width: 50%;
+                margin-bottom: 10px;
+                padding-right: 5px; /* Reduce padding for very small screens */
+            }
+            
+            .stat-value {
+                font-size: 1.1em;
+            }
+            
+            .stat-label {
+                font-size: 0.75em;
+            }
+            
+            /* Ensure My Stats title is properly sized */
+            .profile-heading h2 {
+                font-size: 1.2em;
             }
         }
         
