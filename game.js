@@ -284,6 +284,7 @@ const SERVER_URL = `ws://${window.location.hostname}:8080`; // Adjust if server 
 
 // APM tracking variables
 let actionCount = 0;
+let gameStartTime = 0;
 let gameTimeInMinutes = 0;
 let apm = 0;
 
@@ -807,6 +808,12 @@ function initGameState() {
   gameWon = false;
   gameStarted = true;
   
+  // Reset APM tracking
+  actionCount = 0;
+  gameStartTime = Date.now();
+  gameTimeInMinutes = 0;
+  apm = 0;
+  
   // Update UI
   updateScore(score);
   updateLines(linesCleared);
@@ -953,6 +960,10 @@ function movePiece(dx, dy) {
     if (dy === 0) {
       resetLockDelayIfTouching(); // Reset lock delay after successful rotation
     }
+    // Track movement as an action for APM
+    if (dx !== 0 || dy !== 0) {
+      incrementActionCount();
+    }
     return true; // Move successful
   } else if (dy > 0) {
     // If moving down caused collision, start lock delay
@@ -972,6 +983,8 @@ function softDrop() {
     moveCount++;
     // Add score for soft drop (optional)
     score += 1;
+    // Track soft drop as an action for APM
+    incrementActionCount();
   }
   
   // Reset last time to prevent immediate auto-drop after soft drop
@@ -997,6 +1010,8 @@ function hardDrop() {
   // Add score for hard drop (optional)
   // score += distance * 2;
   // scoreElement.textContent = `Score: ${score}`;
+  // Track hard drop as an action for APM
+  incrementActionCount();
   lockPiece();
 }
 
@@ -1053,6 +1068,8 @@ function rotatePiece() {
       console.log(
         `Rotated ${pieceType} to state ${nextRotation} with kick [${dx}, ${dy}]`
       );
+      // Track rotation as an action for APM
+      incrementActionCount();
       return; // Exit after successful rotation
     }
   }
@@ -1306,6 +1323,8 @@ function holdCurrentPiece() {
 
   canHold = false; // Can only hold once per piece lock
   drawHoldPiece();
+  // Track hold as an action for APM
+  incrementActionCount();
 }
 
 // --- Drawing Pending Garbage Indicator ---
@@ -2147,6 +2166,15 @@ function checkGameOver() {
             
             // Get user ID from localStorage
             const userId = localStorage.getItem('tetris_user_id');
+            
+            // Calculate final APM
+            gameTimeInMinutes = (Date.now() - gameStartTime) / 60000;
+            if (gameTimeInMinutes > 0) {
+              apm = Math.round(actionCount / gameTimeInMinutes);
+              apm = Math.min(apm, 1000); // Cap at 1000 to prevent extreme values
+            }
+            
+            console.log(`Game over - Final APM: ${apm} (${actionCount} actions in ${gameTimeInMinutes.toFixed(2)} minutes)`);
             
             // Always send the user ID with the game over message
             if (userId) {

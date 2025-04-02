@@ -498,6 +498,8 @@ wss.on('connection', (ws) => {
                         if (data.payload.apm !== undefined) {
                             ws.lastApm = parseInt(data.payload.apm) || 0;
                             console.log(`Player ${ws.playerNumber} final APM: ${ws.lastApm}`);
+                        } else {
+                            console.warn(`No APM data received from player ${ws.playerNumber}`);
                         }
                         
                         // Check if the other player is still playing
@@ -1048,6 +1050,16 @@ function handleRoomCleanup(roomId, disconnectedPlayerId = null) {
         winnerApm: winnerId === player1Client.userId ? (player1Client.lastApm || 0) : (player2Client.lastApm || 0),
         loserApm: winnerId !== player1Client.userId ? (player1Client.lastApm || 0) : (player2Client.lastApm || 0)
       };
+      
+      // For debugging APM
+      console.log('Match data APM values:', {
+        winnerApm: matchData.winnerApm,
+        loserApm: matchData.loserApm,
+        player1Apm: player1Client.lastApm || 0,
+        player2Apm: player2Client.lastApm || 0,
+        player1Lost: player1Lost,
+        player2Lost: player2Lost
+      });
       
       // Record the match result
       const gameStatsModel = require('./models/gameStatsModel');
