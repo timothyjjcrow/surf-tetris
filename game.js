@@ -690,30 +690,17 @@ function showMatchmakingState(isMatchmaking) {
   }
 }
 
-function enableStartScreen() {
-  // Hide the "Finding Match" spinner if it exists
-  const spinner = document.getElementById("matchmaking-spinner");
-  if (spinner) {
-    spinner.remove();
+// Disable buttons/input during connection/matchmaking attempts
+function disableStartScreen(reason = "") {
+  if (reason) {
+    updateStatus(reason);
   }
-
-  // Enable all start screen buttons
-  playPublicButton.disabled = false;
-  createPrivateButton.disabled = false;
-  joinPrivateButton.disabled = false;
-  playPublicButton.style.opacity = "1";
-  createPrivateButton.style.opacity = "1";
-  joinPrivateButton.style.opacity = "1";
   
-  // Make sure the status is reset
-  updateStatus("Ready to play. Choose a match type.");
-  
-  // Reset the matchmaking state
-  searchingForMatch = false;
-  hideElement(findingMatchContainer);
-  
-  // Ensure start screen is visible
-  showElement(startScreen);
+  // Don't hide the screen, just disable the buttons
+  playPublicButton.disabled = true;
+  createPrivateButton.disabled = true;
+  joinPrivateButton.disabled = true;
+  roomCodeInput.disabled = true;
 }
 
 // --- Initialization ---
@@ -1293,8 +1280,6 @@ function drawOpponentBoard() {
 }
 
 // --- Opponent Board Management ---
-// Note: The duplicate initOpponentBoard function was removed here
-
 function updateOpponentBoard(newBoardState) {
   // Directly replace the opponent's board state
   // Assumes server sends the complete board state
