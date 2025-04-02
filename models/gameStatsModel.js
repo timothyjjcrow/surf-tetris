@@ -216,6 +216,48 @@ const gameStatsModel = {
     }
   },
   
+  // Get enhanced leaderboard data with average score and lines
+  async getLeaderboardWithStats(limit = 50, offset = 0) {
+    try {
+      const result = await db.query(
+        `SELECT 
+          u.id, u.username, 
+          ps.elo_rating, ps.wins, ps.losses, ps.games_played,
+          CASE WHEN ps.games_played > 0 THEN
+            ROUND((ps.wins::FLOAT / ps.games_played) * 100)
+          ELSE 0 END as win_percentage,
+          (SELECT ROUND(AVG(
+            CASE 
+              WHEN mh.player1_id = u.id THEN mh.player1_score
+              WHEN mh.player2_id = u.id THEN mh.player2_score
+              ELSE 0
+            END
+          )) FROM match_history mh 
+           WHERE mh.player1_id = u.id OR mh.player2_id = u.id) as avg_score,
+          (SELECT ROUND(AVG(
+            CASE 
+              WHEN mh.player1_id = u.id THEN mh.player1_lines
+              WHEN mh.player2_id = u.id THEN mh.player2_lines
+              ELSE 0
+            END
+          )) FROM match_history mh 
+           WHERE mh.player1_id = u.id OR mh.player2_id = u.id) as avg_lines,
+          (SELECT COUNT(*) FROM match_history mh 
+           WHERE (mh.player1_id = u.id OR mh.player2_id = u.id)) as total_matches
+        FROM player_stats ps
+        JOIN users u ON ps.user_id = u.id
+        ORDER BY ps.elo_rating DESC
+        LIMIT $1 OFFSET $2`,
+        [limit, offset]
+      );
+      
+      return { success: true, leaderboard: result.rows };
+    } catch (error) {
+      console.error('Error fetching enhanced leaderboard:', error);
+      return { success: false, error: 'Failed to fetch enhanced leaderboard' };
+    }
+  },
+  
   // Get player match history
   async getPlayerMatchHistory(userId, limit = 10, offset = 0) {
     try {

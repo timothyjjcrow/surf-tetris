@@ -6,7 +6,7 @@
     <title>Tetris Battle - Leaderboard</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #121212;
             color: white;
             margin: 0;
@@ -14,7 +14,7 @@
         }
         
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -31,33 +31,55 @@
         h1 {
             color: #00FF00;
             margin: 0;
+            text-shadow: 0 0 10px rgba(0,255,0,0.3);
+            font-size: 2rem;
+        }
+        
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
         
         .nav-links a {
             color: #00FF00;
             text-decoration: none;
-            margin-left: 20px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            padding: 8px 15px;
+            border-radius: 4px;
         }
         
         .nav-links a:hover {
-            text-decoration: underline;
+            background-color: rgba(0, 255, 0, 0.1);
+            transform: translateY(-2px);
         }
         
         .leaderboard {
             width: 100%;
             border-collapse: collapse;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
         }
         
         .leaderboard th, .leaderboard td {
             padding: 12px 15px;
             text-align: left;
-            border-bottom: 1px solid #333;
         }
         
         .leaderboard th {
             background-color: #232323;
             color: #00FF00;
             font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .leaderboard tr {
+            border-bottom: 1px solid #333;
+            transition: all 0.2s ease;
         }
         
         .leaderboard tr:nth-child(even) {
@@ -66,6 +88,8 @@
         
         .leaderboard tr:hover {
             background-color: #2a2a2a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
         
         .rank {
@@ -101,46 +125,166 @@
         
         .profile-info {
             background-color: #232323;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
         }
         
-        .profile-info p {
-            margin: 5px 0;
+        .profile-info:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .stat-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #999;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #00FF00;
         }
         
         .profile-heading {
+            grid-column: 1 / -1;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #333;
         }
         
         .login-prompt {
             text-align: center;
-            padding: 20px;
+            padding: 30px;
             background-color: #232323;
-            border-radius: 5px;
-            margin-bottom: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
         
         .login-prompt a {
             color: #00FF00;
             text-decoration: none;
             font-weight: bold;
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: rgba(0, 255, 0, 0.1);
+            border-radius: 5px;
+            transition: all 0.3s ease;
         }
         
         .login-prompt a:hover {
-            text-decoration: underline;
+            background-color: rgba(0, 255, 0, 0.2);
+            transform: translateY(-2px);
         }
         
         .refresh-btn {
             background-color: #00FF00;
             color: black;
-            padding: 8px 15px;
+            padding: 10px 18px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            background-color: #00cc00;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 0, 0.2);
+        }
+        
+        .refresh-btn:disabled {
+            background-color: #2a2a2a;
+            color: #666;
+            cursor: not-allowed;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            color: #00FF00;
+            font-size: 1.5rem;
+            margin: 0;
+        }
+        
+        .stat-group.highlight .stat-value {
+            color: gold;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            header {
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+            }
+            
+            .nav-links {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            
+            .leaderboard {
+                font-size: 0.9em;
+            }
+            
+            .leaderboard th, .leaderboard td {
+                padding: 8px 10px;
+            }
+            
+            .profile-info {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .profile-heading {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+        }
+        
+        /* Additional Column Styling */
+        .numeric-cell {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .username-cell {
+            font-weight: 500;
+        }
+        
+        /* Table scrolling for mobile */
+        .table-container {
+            overflow-x: auto;
+            max-width: 100%;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
         }
     </style>
 </head>
@@ -151,7 +295,6 @@
             <div class="nav-links">
                 <button id="refresh-leaderboard" class="refresh-btn">Refresh Leaderboard</button>
                 <a href="index.html">Play Game</a>
-                <a href="#" id="profile-link">My Profile</a>
                 <a href="#" id="logout-link">Logout</a>
             </div>
         </header>
@@ -167,34 +310,74 @@
                     <h2>My Stats</h2>
                     <span id="player-rank"></span>
                 </div>
-                <p>Username: <span id="profile-username"></span></p>
-                <p>ELO Rating: <span id="profile-elo"></span></p>
-                <p>Wins: <span id="profile-wins"></span></p>
-                <p>Losses: <span id="profile-losses"></span></p>
-                <p>Win Rate: <span id="profile-winrate"></span>%</p>
+                
+                <div class="stat-group">
+                    <div class="stat-label">Username</div>
+                    <div id="profile-username" class="stat-value"></div>
+                </div>
+                
+                <div class="stat-group">
+                    <div class="stat-label">ELO Rating</div>
+                    <div id="profile-elo" class="stat-value"></div>
+                </div>
+                
+                <div class="stat-group">
+                    <div class="stat-label">Wins</div>
+                    <div id="profile-wins" class="stat-value"></div>
+                </div>
+                
+                <div class="stat-group">
+                    <div class="stat-label">Losses</div>
+                    <div id="profile-losses" class="stat-value"></div>
+                </div>
+                
+                <div class="stat-group">
+                    <div class="stat-label">Win Rate</div>
+                    <div id="profile-winrate" class="stat-value"></div>
+                </div>
+                
+                <div class="stat-group">
+                    <div class="stat-label">Avg. Score</div>
+                    <div id="profile-avg-score" class="stat-value">-</div>
+                </div>
+                
+                <div class="stat-group">
+                    <div class="stat-label">Avg. Lines</div>
+                    <div id="profile-avg-lines" class="stat-value">-</div>
+                </div>
+                
+                <div class="stat-group">
+                    <div class="stat-label">Total Matches</div>
+                    <div id="profile-total-matches" class="stat-value">-</div>
+                </div>
             </div>
             
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h2>Top Players</h2>
+            <div class="section-header">
+                <h2 class="section-title">Top Players</h2>
             </div>
             
-            <table class="leaderboard">
-                <thead>
-                    <tr>
-                        <th>Rank</th>
-                        <th>Player</th>
-                        <th>ELO Rating</th>
-                        <th>Wins</th>
-                        <th>Losses</th>
-                        <th>Win Rate</th>
-                    </tr>
-                </thead>
-                <tbody id="leaderboard-body">
-                    <tr class="loading">
-                        <td colspan="6">Loading leaderboard data...</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="table-container">
+                <table class="leaderboard">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Player</th>
+                            <th>ELO</th>
+                            <th>Wins</th>
+                            <th>Losses</th>
+                            <th>Win Rate</th>
+                            <th>Avg Score</th>
+                            <th>Avg Lines</th>
+                            <th>Matches</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-body">
+                        <tr class="loading">
+                            <td colspan="9">Loading leaderboard data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     
@@ -220,11 +403,6 @@
                     window.location.href = 'login.html';
                 });
                 
-                document.getElementById('profile-link').addEventListener('click', function(e) {
-                    e.preventDefault();
-                    fetchUserProfile();
-                });
-                
                 // Add refresh button event listener
                 document.getElementById('refresh-leaderboard').addEventListener('click', function() {
                     console.log('Refreshing leaderboard data...');
@@ -246,7 +424,7 @@
                     const leaderboardBody = document.getElementById('leaderboard-body');
                     leaderboardBody.innerHTML = `
                         <tr>
-                            <td colspan="6" style="text-align: center;">Loading leaderboard data...</td>
+                            <td colspan="9" style="text-align: center;">Loading leaderboard data...</td>
                         </tr>
                     `;
                     
@@ -272,14 +450,37 @@
                     
                     console.log('Leaderboard data received:', leaderboardData);
                     displayLeaderboard(leaderboardData);
+                    
+                    // Display user stats if available
+                    if (userId) {
+                        const userStats = leaderboardData.find(player => player.id === parseInt(userId));
+                        if (userStats) {
+                            displayUserStats(userStats, leaderboardData.findIndex(player => player.id === parseInt(userId)) + 1);
+                        }
+                    }
                 } catch (error) {
                     console.error('Error fetching leaderboard:', error);
                     document.getElementById('leaderboard-body').innerHTML = `
                         <tr class="error">
-                            <td colspan="6">Error loading leaderboard data: ${error.message}. Please try refreshing.</td>
+                            <td colspan="9">Error loading leaderboard data: ${error.message}. Please try refreshing.</td>
                         </tr>
                     `;
                 }
+            }
+            
+            function displayUserStats(userStats, rank) {
+                document.getElementById('profile-section').style.display = 'grid';
+                document.getElementById('profile-username').textContent = userStats.username;
+                document.getElementById('profile-elo').textContent = userStats.elo_rating;
+                document.getElementById('profile-wins').textContent = userStats.wins;
+                document.getElementById('profile-losses').textContent = userStats.losses;
+                document.getElementById('profile-winrate').textContent = `${userStats.win_percentage}%`;
+                document.getElementById('player-rank').textContent = `Rank #${rank}`;
+                
+                // New stats
+                document.getElementById('profile-avg-score').textContent = userStats.avg_score || '-';
+                document.getElementById('profile-avg-lines').textContent = userStats.avg_lines || '-';
+                document.getElementById('profile-total-matches').textContent = userStats.total_matches || '-';
             }
             
             function displayLeaderboard(players) {
@@ -288,7 +489,7 @@
                 if (players.length === 0) {
                     leaderboardBody.innerHTML = `
                         <tr>
-                            <td colspan="6" style="text-align: center;">No players on the leaderboard yet.</td>
+                            <td colspan="9" style="text-align: center;">No players on the leaderboard yet.</td>
                         </tr>
                     `;
                     return;
@@ -302,51 +503,25 @@
                     
                     const highlightCurrentUser = userId && player.id === parseInt(userId) ? 'style="background-color: rgba(0, 255, 0, 0.1);"' : '';
                     
+                    // Handle null values
+                    const avgScore = player.avg_score || '-';
+                    const avgLines = player.avg_lines || '-';
+                    const totalMatches = player.total_matches || '0';
+                    
                     return `
                         <tr ${highlightCurrentUser}>
                             <td class="rank ${rankClass}">${index + 1}</td>
-                            <td>${player.username}</td>
-                            <td>${player.elo_rating}</td>
-                            <td>${player.wins}</td>
-                            <td>${player.losses}</td>
-                            <td>${player.win_percentage}%</td>
+                            <td class="username-cell">${player.username}</td>
+                            <td class="numeric-cell">${player.elo_rating}</td>
+                            <td class="numeric-cell">${player.wins}</td>
+                            <td class="numeric-cell">${player.losses}</td>
+                            <td class="numeric-cell">${player.win_percentage}%</td>
+                            <td class="numeric-cell">${avgScore}</td>
+                            <td class="numeric-cell">${avgLines}</td>
+                            <td class="numeric-cell">${totalMatches}</td>
                         </tr>
                     `;
                 }).join('');
-            }
-            
-            async function fetchUserProfile() {
-                if (!token) return;
-                
-                try {
-                    const response = await fetch('/api/auth/profile', {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch profile');
-                    }
-                    
-                    const profileData = await response.json();
-                    
-                    // Display profile data
-                    document.getElementById('profile-elo').textContent = profileData.elo_rating;
-                    document.getElementById('profile-wins').textContent = profileData.wins;
-                    document.getElementById('profile-losses').textContent = profileData.losses;
-                    
-                    const winRate = profileData.games_played > 0 
-                        ? Math.round((profileData.wins / profileData.games_played) * 100) 
-                        : 0;
-                    document.getElementById('profile-winrate').textContent = winRate;
-                    
-                    // Fetch player rank (this would be a separate API call)
-                    // For now we'll just use placeholder
-                    document.getElementById('player-rank').textContent = "Loading rank...";
-                } catch (error) {
-                    console.error('Error fetching profile:', error);
-                }
             }
         });
     </script>

@@ -74,6 +74,26 @@ app.get('/api/stats/test-leaderboard', (req, res) => {
   res.json(testLeaderboard);
 });
 
+// API endpoint for leaderboard
+app.get('/api/stats/leaderboard', async (req, res) => {
+  try {
+    console.log('Fetching leaderboard data');
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+    
+    const result = await gameStatsModel.getLeaderboardWithStats(limit, offset);
+    
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+    
+    res.json(result.leaderboard);
+  } catch (error) {
+    console.error('Error serving leaderboard:', error);
+    res.status(500).json({ error: 'Server error fetching leaderboard data' });
+  }
+});
+
 // Store active game rooms and waiting player
 let gameRooms = new Map(); // roomId -> { id: string, player1: ws, player2: ws, roomType: 'public'|'private', /* other room state */ }
 let waitingPlayer = null;   // Holds the WebSocket of the player waiting for a public match
