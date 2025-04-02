@@ -690,19 +690,6 @@ function showMatchmakingState(isMatchmaking) {
   }
 }
 
-// Disable buttons/input during connection/matchmaking attempts
-function disableStartScreen(reason = "") {
-  if (reason) {
-    updateStatus(reason);
-  }
-  
-  // Don't hide the screen, just disable the buttons
-  playPublicButton.disabled = true;
-  createPrivateButton.disabled = true;
-  joinPrivateButton.disabled = true;
-  roomCodeInput.disabled = true;
-}
-
 // --- Initialization ---
 function initGameState() {
   // Initialize game state variables
