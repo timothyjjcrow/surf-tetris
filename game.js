@@ -631,6 +631,38 @@ function handleServerMessage(message) {
       }
       break;
 
+    case "waiting_for_opponent":
+      // Handle waiting for opponent to accept/decline
+      // Get the message element to update
+      const waitingMessage = document.getElementById("matchFoundMessage");
+      waitingMessage.textContent = message.payload.message || "Waiting for opponent to accept or decline...";
+      
+      // Disable the buttons to prevent further actions
+      const acceptMatchButton = document.getElementById("acceptMatchButton");
+      const declineMatchButton = document.getElementById("declineMatchButton");
+      acceptMatchButton.disabled = true;
+      declineMatchButton.disabled = true;
+      
+      // Add visual indication that we're waiting
+      acceptMatchButton.style.opacity = "0.5";
+      declineMatchButton.style.opacity = "0.5";
+      
+      // Add a spinner to indicate waiting
+      if (!document.getElementById("waiting-spinner")) {
+        const spinner = document.createElement("div");
+        spinner.id = "waiting-spinner";
+        spinner.innerHTML = "⟳"; // Simple spinner character
+        spinner.style.display = "inline-block";
+        spinner.style.marginLeft = "10px";
+        spinner.style.animation = "spin 1s linear infinite";
+        spinner.style.fontSize = "24px";
+        spinner.style.color = "#4CAF50";
+        waitingMessage.appendChild(spinner);
+      }
+      
+      updateStatus("You've accepted the match. Waiting for opponent...");
+      break;
+
     default:
       console.log(`Unknown message type from server: ${message.type}`);
   }

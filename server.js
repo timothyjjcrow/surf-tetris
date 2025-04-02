@@ -222,9 +222,22 @@ wss.on('connection', (ws) => {
                             if (ws === pendingMatch.player1) {
                                 pendingMatch.player1Accepted = true;
                                 console.log(`Player 1 (${ws.userId}) accepted match in room ${roomId}`);
+                                
+                                // Notify player they're waiting for opponent
+                                sendMessage(ws, {
+                                    type: 'waiting_for_opponent',
+                                    payload: { message: 'Waiting for opponent to accept or decline...' }
+                                });
+                                
                             } else if (ws === pendingMatch.player2) {
                                 pendingMatch.player2Accepted = true;
                                 console.log(`Player 2 (${ws.userId}) accepted match in room ${roomId}`);
+                                
+                                // Notify player they're waiting for opponent
+                                sendMessage(ws, {
+                                    type: 'waiting_for_opponent',
+                                    payload: { message: 'Waiting for opponent to accept or decline...' }
+                                });
                             }
                             
                             // Check if both players have accepted
