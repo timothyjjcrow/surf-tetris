@@ -690,19 +690,6 @@ function showMatchmakingState(isMatchmaking) {
   }
 }
 
-// Disable buttons/input during connection/matchmaking attempts
-function disableStartScreen(reason = "") {
-  if (reason) {
-    updateStatus(reason);
-  }
-  
-  // Don't hide the screen, just disable the buttons
-  playPublicButton.disabled = true;
-  createPrivateButton.disabled = true;
-  joinPrivateButton.disabled = true;
-  roomCodeInput.disabled = true;
-}
-
 function enableStartScreen() {
   // Hide the "Finding Match" spinner if it exists
   const spinner = document.getElementById("matchmaking-spinner");
@@ -1960,6 +1947,7 @@ function disableStartScreen(reason = "") {
   roomCodeInput.disabled = true;
 }
 
+// Enable start screen buttons
 function enableStartScreen() {
   startScreen.style.display = "block";
   
