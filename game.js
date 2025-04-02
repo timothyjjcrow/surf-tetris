@@ -373,7 +373,29 @@ function handleServerMessage(message) {
         // Show the match found dialog
         const matchFoundDialog = document.getElementById("matchFoundDialog");
         const matchFoundMessage = document.getElementById("matchFoundMessage");
+        
+        // Reset any previous match state
         matchFoundMessage.textContent = `An opponent has been found! You will play as Player ${playerNumber}.`;
+        
+        // Ensure buttons are reset and enabled for the new match
+        const acceptButton = document.getElementById("acceptMatchButton");
+        const declineButton = document.getElementById("declineMatchButton");
+        
+        // Re-enable the buttons
+        acceptButton.disabled = false;
+        declineButton.disabled = false;
+        
+        // Reset button styling
+        acceptButton.style.opacity = "1";
+        declineButton.style.opacity = "1";
+        
+        // Remove any waiting spinner if it exists
+        const spinner = document.getElementById("waiting-spinner");
+        if (spinner) {
+          spinner.remove();
+        }
+        
+        // Show the dialog
         matchFoundDialog.style.display = "block";
         
         // Reset search state when match is found
@@ -399,7 +421,8 @@ function handleServerMessage(message) {
 
     case "match_declined":
       // Handle when opponent declines the match
-      document.getElementById("matchFoundDialog").style.display = "none";
+      const declinedDialog = document.getElementById("matchFoundDialog");
+      declinedDialog.style.display = "none";
       updateStatus("Opponent declined the match. You can search for another game.");
       
       // Reset matchmaking state
@@ -407,19 +430,52 @@ function handleServerMessage(message) {
       playerNumber = null;
       roomId = null;
       
+      // Make sure the accept/decline buttons are reset for future matches
+      const acceptBtn = document.getElementById("acceptMatchButton");
+      const declineBtn = document.getElementById("declineMatchButton");
+      
+      // Reset button states
+      acceptBtn.disabled = false;
+      declineBtn.disabled = false;
+      acceptBtn.style.opacity = "1";
+      declineBtn.style.opacity = "1";
+      
+      // Remove any waiting spinner if it exists
+      const waitingSpinner = document.getElementById("waiting-spinner");
+      if (waitingSpinner) {
+        waitingSpinner.remove();
+      }
+      
       // Re-enable the start screen buttons
       enableStartScreen();
       break;
 
     case "matchmaking_reset":
       // Handle when matchmaking is reset (either by declining or other reasons)
-      document.getElementById("matchFoundDialog").style.display = "none";
+      const resetDialog = document.getElementById("matchFoundDialog");
+      resetDialog.style.display = "none";
       updateStatus(message.payload.message || "Matchmaking has been reset. You can search for another game.");
       
       // Reset matchmaking state
       searchingForMatch = false;
       playerNumber = null;
       roomId = null;
+      
+      // Make sure the accept/decline buttons are reset for future matches
+      const resetAcceptBtn = document.getElementById("acceptMatchButton");
+      const resetDeclineBtn = document.getElementById("declineMatchButton");
+      
+      // Reset button states
+      resetAcceptBtn.disabled = false;
+      resetDeclineBtn.disabled = false;
+      resetAcceptBtn.style.opacity = "1";
+      resetDeclineBtn.style.opacity = "1";
+      
+      // Remove any waiting spinner if it exists
+      const resetSpinner = document.getElementById("waiting-spinner");
+      if (resetSpinner) {
+        resetSpinner.remove();
+      }
       
       // Re-enable the start screen buttons
       enableStartScreen();
@@ -640,6 +696,8 @@ function handleServerMessage(message) {
       // Disable the buttons to prevent further actions
       const acceptMatchButton = document.getElementById("acceptMatchButton");
       const declineMatchButton = document.getElementById("declineMatchButton");
+      
+      // Disable the buttons
       acceptMatchButton.disabled = true;
       declineMatchButton.disabled = true;
       
