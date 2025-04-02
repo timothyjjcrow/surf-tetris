@@ -401,8 +401,27 @@ function handleServerMessage(message) {
       // Handle when opponent declines the match
       document.getElementById("matchFoundDialog").style.display = "none";
       updateStatus("Opponent declined the match. You can search for another game.");
+      
       // Reset matchmaking state
       searchingForMatch = false;
+      playerNumber = null;
+      roomId = null;
+      
+      // Re-enable the start screen buttons
+      enableStartScreen();
+      break;
+
+    case "matchmaking_reset":
+      // Handle when matchmaking is reset (either by declining or other reasons)
+      document.getElementById("matchFoundDialog").style.display = "none";
+      updateStatus(message.payload.message || "Matchmaking has been reset. You can search for another game.");
+      
+      // Reset matchmaking state
+      searchingForMatch = false;
+      playerNumber = null;
+      roomId = null;
+      
+      // Re-enable the start screen buttons
       enableStartScreen();
       break;
 
@@ -619,6 +638,8 @@ function handleServerMessage(message) {
 
 // Handle matchmaking button state
 function showMatchmakingState(isMatchmaking) {
+  searchingForMatch = isMatchmaking; // Ensure the flag is updated
+  
   if (isMatchmaking) {
     // Disable all matchmaking buttons during matchmaking
     playPublicButton.disabled = true;
@@ -667,6 +688,45 @@ function showMatchmakingState(isMatchmaking) {
       spinner.remove();
     }
   }
+}
+
+// Disable buttons/input during connection/matchmaking attempts
+function disableStartScreen(reason = "") {
+  if (reason) {
+    updateStatus(reason);
+  }
+  
+  // Don't hide the screen, just disable the buttons
+  playPublicButton.disabled = true;
+  createPrivateButton.disabled = true;
+  joinPrivateButton.disabled = true;
+  roomCodeInput.disabled = true;
+}
+
+function enableStartScreen() {
+  // Hide the "Finding Match" spinner if it exists
+  const spinner = document.getElementById("matchmaking-spinner");
+  if (spinner) {
+    spinner.remove();
+  }
+
+  // Enable all start screen buttons
+  playPublicButton.disabled = false;
+  createPrivateButton.disabled = false;
+  joinPrivateButton.disabled = false;
+  playPublicButton.style.opacity = "1";
+  createPrivateButton.style.opacity = "1";
+  joinPrivateButton.style.opacity = "1";
+  
+  // Make sure the status is reset
+  updateStatus("Ready to play. Choose a match type.");
+  
+  // Reset the matchmaking state
+  searchingForMatch = false;
+  hideElement(findingMatchContainer);
+  
+  // Ensure start screen is visible
+  showElement(startScreen);
 }
 
 // --- Initialization ---

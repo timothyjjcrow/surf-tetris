@@ -267,11 +267,25 @@ wss.on('connection', (ws) => {
                                     type: 'match_declined',
                                     payload: { message: 'Opponent declined the match.' }
                                 });
+                                
+                                // Clear opponent's room assignment and player number
+                                opponent.roomId = null;
+                                opponent.playerNumber = null;
                             }
+                            
+                            // Clear this player's room assignment and player number
+                            ws.roomId = null;
+                            ws.playerNumber = null;
                             
                             // Clean up room and pending match
                             pendingMatches.delete(roomId);
                             handleRoomCleanup(roomId);
+                            
+                            // Send confirmation to the player who declined that they're now free to find another match
+                            sendMessage(ws, {
+                                type: 'matchmaking_reset',
+                                payload: { message: 'You declined the match. You can search for another game.' }
+                            });
                         }
                     }
                     break;
