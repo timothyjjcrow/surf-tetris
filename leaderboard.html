@@ -233,6 +233,7 @@
             color: gold;
         }
         
+        /* Mobile & Responsive Design */
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -269,6 +270,87 @@
             }
         }
         
+        /* Small tablets and large phones */
+        @media (max-width: 600px) {
+            .leaderboard {
+                font-size: 0.8em;
+            }
+            
+            .leaderboard th, .leaderboard td {
+                padding: 6px 8px;
+            }
+            
+            /* Show only the most important columns on smaller screens */
+            .leaderboard th:nth-child(8),
+            .leaderboard td:nth-child(8),
+            .leaderboard th:nth-child(7),
+            .leaderboard td:nth-child(7) {
+                display: none;
+            }
+            
+            .profile-info {
+                grid-template-columns: 1fr;
+                padding: 15px;
+            }
+            
+            .stat-value {
+                font-size: 1.3em;
+            }
+        }
+        
+        /* Mobile phones */
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .leaderboard {
+                font-size: 0.75em;
+            }
+            
+            .leaderboard th, .leaderboard td {
+                padding: 5px 6px;
+            }
+            
+            /* Further reduce visible columns on very small screens */
+            .leaderboard th:nth-child(6),
+            .leaderboard td:nth-child(6),
+            .leaderboard th:nth-child(5),
+            .leaderboard td:nth-child(5) {
+                display: none;
+            }
+            
+            .refresh-btn {
+                padding: 8px 12px;
+                font-size: 0.9em;
+            }
+            
+            .stat-value {
+                font-size: 1.2em;
+            }
+        }
+        
+        /* Very small screens */
+        @media (max-width: 350px) {
+            .container {
+                padding: 5px;
+            }
+            
+            .leaderboard th:nth-child(4),
+            .leaderboard td:nth-child(4) {
+                display: none;
+            }
+            
+            .leaderboard th, .leaderboard td {
+                padding: 4px 5px;
+            }
+            
+            .profile-info {
+                padding: 10px;
+                gap: 10px;
+            }
+        }
+        
         /* Additional Column Styling */
         .numeric-cell {
             text-align: right;
@@ -285,6 +367,7 @@
             max-width: 100%;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
             border-radius: 8px;
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
         }
     </style>
 </head>
@@ -449,6 +532,10 @@
                     }
                     
                     console.log('Leaderboard data received:', leaderboardData);
+                    
+                    // Save the leaderboard data to localStorage for the resize handler
+                    localStorage.setItem('tetris_leaderboard_data', JSON.stringify(leaderboardData));
+                    
                     displayLeaderboard(leaderboardData);
                     
                     // Display user stats if available
@@ -495,6 +582,9 @@
                     return;
                 }
                 
+                // Check if we're on a mobile device to adapt display
+                const isMobile = window.innerWidth <= 480;
+                
                 leaderboardBody.innerHTML = players.map((player, index) => {
                     const rankClass = 
                         index === 0 ? 'top-rank' : 
@@ -523,6 +613,20 @@
                     `;
                 }).join('');
             }
+            
+            // Add a resize handler to adjust table display based on screen size
+            window.addEventListener('resize', function() {
+                // If we have leaderboard data already displayed, refresh the view
+                if (document.getElementById('leaderboard-body').children.length > 0 && 
+                    !document.getElementById('leaderboard-body').querySelector('.loading') &&
+                    !document.getElementById('leaderboard-body').querySelector('.error')) {
+                    // This will redraw the table based on current screen size
+                    const leaderboardData = JSON.parse(localStorage.getItem('tetris_leaderboard_data') || '[]');
+                    if (leaderboardData.length > 0) {
+                        displayLeaderboard(leaderboardData);
+                    }
+                }
+            });
         });
     </script>
 </body>
